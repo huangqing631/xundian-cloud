@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.14";
+  const APP_VERSION = "2026.11.25.15";
 
   const iconPaths = {
     home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
@@ -1465,6 +1465,13 @@
 
   const launchParams = new URLSearchParams(window.location.search);
   const launchPage = launchParams.get("page");
+  const nativeBridge = window.XundianNative || null;
+  const isNativeApp =
+    launchParams.get("native") === "1" ||
+    Boolean(nativeBridge?.isNativeApp?.());
+  if (isNativeApp) {
+    document.documentElement.classList.add("native-app");
+  }
   if (launchPage) {
     if (state.role === "store") {
       if (launchPage === "issues") ui.mobileTab = "issues";
@@ -1479,6 +1486,118 @@
           ? "tasks"
           : launchPage;
     }
+  }
+
+  function notifyDevice(title, body, id = `message-${Date.now()}`) {
+    try {
+      if (nativeBridge?.notifyMessage) {
+        nativeBridge.notifyMessage(title, body, id);
+        return;
+      }
+      if (
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        new Notification(title, { body, icon: "./icon-192.png" });
+      }
+    } catch {
+      // Notification support varies across browsers and WebView versions.
+    }
+  }
+
+  async function enableDeviceNotifications() {
+    try {
+      if (nativeBridge?.requestNotifications) {
+        nativeBridge.requestNotifications();
+        showToast("已请求系统通知权限，请在手机弹窗中允许");
+        return;
+      }
+      if (!("Notification" in window)) {
+        showToast("当前设备不支持系统通知", "error");
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      showToast(
+        permission === "granted"
+          ? "消息提醒已开启"
+          : "消息提醒未开启，可在浏览器设置中修改",
+        permission === "granted" ? "success" : "error",
+      );
+    } catch {
+      showToast("无法申请通知权限，请检查系统设置", "error");
+    }
+  }
+
+  function parseDueDate(label) {
+    const now = new Date();
+    const defaultHour = 9;
+    let match = String(label || "").match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+    if (match) {
+      return new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+        match[4] ? Number(match[4]) : defaultHour,
+        match[5] ? Number(match[5]) : 0,
+      );
+    }
+    match = String(label || "").match(/^(今天|明天)\s*(\d{2}):(\d{2})/);
+    if (match) {
+      const date = new Date(now);
+      if (match[1] === "明天") date.setDate(date.getDate() + 1);
+      date.setHours(Number(match[2]), Number(match[3]), 0, 0);
+      return date;
+    }
+    match = String(label || "").match(/^(\d{1,2})月\s*(\d{1,2})日(?:\s+(\d{2}):(\d{2}))?/);
+    if (match) {
+      return new Date(
+        now.getFullYear(),
+        Number(match[1]) - 1,
+        Number(match[2]),
+        match[3] ? Number(match[3]) : defaultHour,
+        match[4] ? Number(match[4]) : 0,
+      );
+    }
+    return null;
+  }
+
+  function scheduleNativeReminders() {
+    if (!nativeBridge?.scheduleReminder) return;
+    const now = Date.now();
+    const horizon = now + 30 * 24 * 60 * 60 * 1000;
+    state.tasks
+      .filter(
+        (task) =>
+          !["completed", "submitted"].includes(task.status),
+      )
+      .forEach((task) => {
+        const date = parseDueDate(task.dueLabel);
+        const store = storeById(task.storeId);
+        const timestamp = date?.getTime();
+        if (timestamp && timestamp > now && timestamp < horizon) {
+          nativeBridge.scheduleReminder(
+            timestamp,
+            "巡店任务提醒",
+            `${task.title} · ${store?.name || "商丘区域"} · ${task.dueLabel}`,
+            `task:${task.id}`,
+          );
+        }
+      });
+    state.issues
+      .filter((issue) => issue.status !== "closed")
+      .forEach((issue) => {
+        const date = parseDueDate(issue.due);
+        const store = storeById(issue.storeId);
+        const timestamp = date?.getTime();
+        if (timestamp && timestamp > now && timestamp < horizon) {
+          nativeBridge.scheduleReminder(
+            timestamp,
+            "整改到期提醒",
+            `${issue.title} · ${store?.name || "门店"} · ${issue.due}`,
+            `issue:${issue.id}`,
+          );
+        }
+      });
   }
 
   function saveState() {
@@ -2391,9 +2510,7 @@
             ${icon("bell")}
             <span class="notification-dot"></span>
           </button>
-          <a class="icon-button" href="./xundian-cloud.apk" download aria-label="下载 Android App" title="下载 Android App">
-            ${icon("download")}
-          </a>
+          ${isNativeApp ? "" : `<a class="icon-button" href="./xundian-cloud-native.apk" download aria-label="下载 Android App" title="下载 Android App">${icon("download")}</a>`}
           ${renderAvatar("黄庆", "avatar-green")}
         </div>
       </header>
@@ -3716,7 +3833,7 @@
               <button class="insight-item" data-action="navigate" data-page="store-settings"><span class="insight-number">1</span><p><strong>门店设置</strong><br>营业时间、状态与门店资料</p></button>
               <button class="insight-item" data-action="navigate" data-page="accounts"><span class="insight-number">2</span><p><strong>人员账号设置</strong><br>总部、督导、门店人员与门店绑定</p></button>
               <button class="insight-item" data-action="check-update"><span class="insight-number">3</span><p><strong>应用更新中心</strong><br>检测新版本并让在线用户自动刷新</p></button>
-              <a class="insight-item" href="./xundian-cloud.apk" download><span class="insight-number">4</span><p><strong>Android 安装包</strong><br>下载 APK 安装到 Android 手机</p></a>
+              ${isNativeApp ? "" : `<a class="insight-item" href="./xundian-cloud-native.apk" download><span class="insight-number">4</span><p><strong>Android 原生安装包</strong><br>本地内置应用资源，不再依赖 Chrome 或跳出浏览器</p></a>`}
             </div>
           </section>
         </div>
@@ -4674,6 +4791,7 @@
     root.innerHTML =
       state.role === "store" ? renderStorePortal() : renderDesktopPage();
     root.setAttribute("aria-busy", "false");
+    window.setTimeout(scheduleNativeReminders, 0);
   }
 
   let updateCheckInFlight = false;
@@ -6293,6 +6411,11 @@
     closeModal();
     closeDrawer();
     renderApp();
+    notifyDevice(
+      "巡店报告已提交",
+      `${store.name} 巡检得分 ${score}，等待总经理审核`,
+      `inspection-submit:${task.id}`,
+    );
     showToast(
       `巡检已提交审核，得分 ${score}${
         fail.length ? `，已生成 ${fail.length} 个整改问题` : ""
@@ -6501,6 +6624,13 @@
       saveState();
       closeModal();
       renderApp();
+      notifyDevice(
+        approved ? "任务审核通过" : "任务已驳回",
+        approved
+          ? `${task.title} 已审核通过`
+          : `${task.title} 被驳回，请补充完成结果后重新提交`,
+        `task-review:${task.id}`,
+      );
       showToast(approved ? "任务审核通过" : "任务已驳回执行人");
       return;
     }
@@ -6749,6 +6879,17 @@
       saveState();
       openIssueDrawer(issue.id);
       renderApp();
+      notifyDevice(
+        nextStatus === "closed"
+          ? "整改已通过"
+          : nextStatus === "review"
+            ? "整改已提交"
+            : nextStatus === "rectifying"
+              ? "整改任务已开始"
+              : "整改问题已重新打开",
+        issue.title,
+        `issue-status:${issue.id}:${nextStatus}`,
+      );
       showToast(
         {
           rectifying: "已开始整改",
@@ -6777,6 +6918,11 @@
         action === "approve-account" ? "approved" : "rejected";
       saveState();
       renderApp();
+      notifyDevice(
+        action === "approve-account" ? "账号申请已通过" : "账号申请已拒绝",
+        `${approval.name} · ${approval.requestedRole}`,
+        `approval:${approval.id}`,
+      );
       showToast(
         action === "approve-account"
           ? `已通过 ${approval.name} 的 ${approval.requestedRole} 申请`
@@ -6802,7 +6948,7 @@
       return;
     }
     if (action === "notifications") {
-      showToast("2 项任务即将到期，1 项高风险整改待复核");
+      enableDeviceNotifications();
       return;
     }
     if (action === "open-help") {
@@ -7133,6 +7279,11 @@
       saveState();
       closeModal();
       renderApp();
+      notifyDevice(
+        "任务已提交",
+        `${task.title} 已提交，等待总经理审核`,
+        `task-submit:${task.id}`,
+      );
       showToast("任务已提交，等待总经理审核");
       return;
     }
@@ -7210,6 +7361,15 @@
       saveState();
       closeModal();
       renderApp();
+      notifyDevice(
+        "收到新的任务",
+        `${data.get("title")} · ${
+          assigneeRole === "store"
+            ? selectedStore?.name || "门店"
+            : data.get("supervisor") || "督导"
+        }`,
+        `assignment:${Date.now()}`,
+      );
       showToast(
         `任务已下发至${
           assigneeRole === "store" ? selectedStore?.name : data.get("supervisor")
@@ -7240,6 +7400,11 @@
       });
       saveState();
       closeDrawer();
+      notifyDevice(
+        "巡店已开始",
+        `${storeById(storeId)?.name || "门店"} · 现场检查已发起`,
+        `visit:${taskId}`,
+      );
       showToast("巡店已发起，开始现场检查");
       openInspection(taskId);
       return;
