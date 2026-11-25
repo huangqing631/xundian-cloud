@@ -1,10 +1,11 @@
 {
-  "version": "2026.11.25.19",
-  "nativeVersion": "1.0.5",
+  "version": "2026.11.25.20",
+  "nativeVersion": "1.0.6",
   "downloadUrl": "https://huangqing631.github.io/xundian-cloud/xundian-cloud-native.apk",
   "releasedAt": "2026-11-25T20:05:00+08:00",
   "title": "云端多人协作与消息推送",
   "notes": [
+    "Android 改用固定正式签名证书，后续版本可覆盖升级",
     "相机优先选择超广角镜头，支持镜头切换和低于 1 倍的硬件广角",
     "Android 返回手势改为应用内返回，连续返回两次才退出",
     "新增云端账号登录和跨设备工作区同步",
