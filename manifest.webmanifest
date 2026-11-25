@@ -1,13 +1,19 @@
 {
   "name": "巡店云 · 巴布豆门店运营",
   "short_name": "巡店云",
+  "id": "https://huangqing631.github.io/xundian-cloud/",
   "description": "巴布豆商丘区域 10 家门店的总经理、督导与门店三端协同应用",
   "start_url": "https://huangqing631.github.io/xundian-cloud/",
   "scope": "https://huangqing631.github.io/xundian-cloud/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
   "background_color": "#f6f4ef",
   "theme_color": "#ff5a3d",
   "lang": "zh-CN",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "https://huangqing631.github.io/xundian-cloud/icon-192.png",
@@ -48,12 +54,26 @@
     {
       "name": "开始巡店",
       "short_name": "开始巡店",
-      "url": "https://huangqing631.github.io/xundian-cloud/?page=tasks"
+      "url": "https://huangqing631.github.io/xundian-cloud/?page=tasks",
+      "icons": [
+        {
+          "src": "https://huangqing631.github.io/xundian-cloud/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "问题整改",
       "short_name": "问题整改",
-      "url": "https://huangqing631.github.io/xundian-cloud/?page=issues"
+      "url": "https://huangqing631.github.io/xundian-cloud/?page=issues",
+      "icons": [
+        {
+          "src": "https://huangqing631.github.io/xundian-cloud/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }
