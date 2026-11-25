@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.28";
+  const APP_VERSION = "2026.11.25.29";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -215,6 +215,112 @@
             "遇到火情、人员受伤或重大设备故障时，优先确保人员安全，按应急预案处理，并第一时间联系区域经理。",
         },
       ],
+    },
+    {
+      id: "learn-onboarding",
+      title: "新导购入职第一课",
+      category: "新导购入职",
+      duration: "6 分钟",
+      icon: "user",
+      summary: "快速了解门店制度、日常流程和导购岗位要求。",
+      sections: [
+        {
+          title: "认识门店与岗位",
+          content:
+            "了解门店营业时间、区域划分、常用设备和个人职责。新导购应在带教人员指导下熟悉收银、陈列、仓库和顾客服务流程。",
+        },
+        {
+          title: "日常行为规范",
+          content:
+            "按时到岗，穿着工装并保持仪容整洁。营业期间主动问候顾客，不在销售区聚集聊天，离岗需向负责人报备。",
+        },
+        {
+          title: "入职首周目标",
+          content:
+            "记住门店重点商品和当期活动，能够独立完成迎宾、商品介绍、试穿引导和基础收银操作，并完成首次学习考试。",
+        },
+      ],
+    },
+    {
+      id: "learn-sales",
+      title: "销售推荐与成交技巧",
+      category: "销售技巧",
+      duration: "8 分钟",
+      icon: "target",
+      summary: "从需求判断到连带销售，提升试穿转化和成交效率。",
+      sections: [
+        {
+          title: "观察与提问",
+          content:
+            "先观察顾客关注的品类和风格，再用开放式问题了解使用场景、尺码和预算。不要一开始只报价格。",
+        },
+        {
+          title: "卖点表达",
+          content:
+            "把商品材质、版型、舒适度和搭配场景讲清楚。结合顾客需求推荐两到三款，而不是一次展示太多商品。",
+        },
+        {
+          title: "试穿与连带销售",
+          content:
+            "主动引导试穿，及时提供尺码和搭配建议。根据已选商品推荐互补品类，并说明会员活动与售后保障。",
+        },
+      ],
+    },
+    {
+      id: "learn-product",
+      title: "巴布豆产品知识基础",
+      category: "产品知识",
+      duration: "7 分钟",
+      icon: "package",
+      summary: "掌握品类结构、尺码、材质卖点和产品查询方法。",
+      sections: [
+        {
+          title: "品类与客群",
+          content:
+            "熟悉童装、鞋品和配件的品类结构，了解不同年龄段顾客的尺码与穿着需求，快速定位合适商品。",
+        },
+        {
+          title: "材质与卖点",
+          content:
+            "掌握纯棉、针织、防风等常见材质的舒适性、适用季节和护理方式，能够用简单语言向顾客说明。",
+        },
+        {
+          title: "库存与查询",
+          content:
+            "能够通过客员通查询尺码、库存、活动和会员信息。缺码时及时查询其他门店或提供替代款建议。",
+        },
+      ],
+    },
+  ];
+
+  const learningPlans = [
+    {
+      id: "plan-onboarding",
+      title: "新导购入职学习",
+      description: "快速熟悉岗位、门店制度和基础服务流程",
+      icon: "user",
+      courseIds: ["learn-onboarding", "learn-service"],
+    },
+    {
+      id: "plan-operations",
+      title: "运营学习",
+      description: "掌握日常运营、商品陈列和安全管理",
+      icon: "store",
+      courseIds: ["learn-daily-ops", "learn-display", "learn-safety"],
+    },
+    {
+      id: "plan-sales",
+      title: "销售技巧学习",
+      description: "提升需求判断、商品推荐与成交能力",
+      icon: "target",
+      courseIds: ["learn-sales", "learn-service"],
+    },
+    {
+      id: "plan-product",
+      title: "产品知识学习",
+      description: "熟悉巴布豆品类、尺码、材质和库存查询",
+      icon: "package",
+      courseIds: ["learn-product"],
     },
   ];
 
@@ -4986,19 +5092,19 @@
         <section class="mobile-section">
           <div class="mobile-section-title"><h2>快捷操作</h2></div>
           <div class="mobile-quick-grid">
-            <button class="mobile-quick" data-action="mobile-submit-issue">
+            <button class="mobile-quick" data-action="mobile-tab" data-mobile-tab="issues">
               <span class="mobile-quick-icon" style="--accent: var(--brand); --tint: var(--brand-soft)">${icon(
                 "camera",
                 "icon-sm",
               )}</span>
-              提交整改
+              待整改
             </button>
             <button class="mobile-quick" data-action="mobile-tab" data-mobile-tab="tasks">
               <span class="mobile-quick-icon" style="--accent: var(--green); --tint: var(--green-soft)">${icon(
                 "list-checks",
                 "icon-sm",
               )}</span>
-              运营任务
+              日常任务
             </button>
             <button class="mobile-quick" data-action="open-learning">
               <span class="mobile-quick-icon" style="--accent: var(--blue); --tint: var(--blue-soft)">${icon(
@@ -5012,7 +5118,7 @@
 
         <section class="mobile-section">
           <div class="mobile-section-title">
-            <h2>门店任务 · ${mobileStoreOperationalTasks().filter((task) => !["completed", "submitted"].includes(task.status)).length}</h2>
+            <h2>日常任务 · ${mobileStoreOperationalTasks().filter((task) => !["completed", "submitted"].includes(task.status)).length}</h2>
             <button data-action="mobile-tab" data-mobile-tab="tasks">查看全部</button>
           </div>
           ${
@@ -6574,7 +6680,7 @@
     ).length;
     const exam = learningRecord("exam-daily-ops");
     return `
-      <div class="${mobile ? "mobile-learning" : "learning-center"}">
+      <div class="${mobile ? "mobile-learning store-mobile-content" : "learning-center"}">
         <section class="learning-hero">
           <div>
             <div class="eyebrow">Learning center</div>
@@ -6586,6 +6692,38 @@
             <span>课程完成</span>
           </div>
         </section>
+        <section class="learning-plan-section">
+          <div class="detail-section-title"><h3>学习规划</h3><span>按岗位和目标选择学习路径</span></div>
+          <div class="learning-plan-grid">
+            ${learningPlans
+              .map((plan) => {
+                const planCourses = plan.courseIds
+                  .map((id) => learningCourses.find((course) => course.id === id))
+                  .filter(Boolean);
+                const planCompleted = planCourses.filter(
+                  (course) =>
+                    learningRecord(course.id)?.status === "completed",
+                ).length;
+                return `
+                  <article class="learning-plan-card">
+                    <div class="learning-plan-head">
+                      <span class="learning-plan-icon">${icon(plan.icon)}</span>
+                      <div><h3>${escapeHtml(plan.title)}</h3><p>${escapeHtml(plan.description)}</p></div>
+                    </div>
+                    <div class="learning-plan-progress"><span style="width:${
+                      planCourses.length
+                        ? Math.round((planCompleted / planCourses.length) * 100)
+                        : 0
+                    }%"></span></div>
+                    <div class="learning-plan-meta"><span>${planCompleted}/${planCourses.length} 已完成</span><button class="button button-secondary button-sm" data-action="start-learning-plan" data-plan-id="${plan.id}">${planCompleted ? "继续学习" : "开始规划"}</button></div>
+                  </article>
+                `;
+              })
+              .join("")}
+          </div>
+        </section>
+        <section>
+          <div class="detail-section-title"><h3>内容学习</h3><span>全部课程</span></div>
         <div class="learning-course-grid">
           ${learningCourses
             .map((course) => {
@@ -6602,6 +6740,7 @@
             })
             .join("")}
         </div>
+        </section>
         <section class="learning-exam-card">
           <div>
             <span class="badge ${exam?.status === "passed" ? "success" : exam?.status === "failed" ? "warning" : "info"}">${exam?.status === "passed" ? "考试已通过" : exam?.status === "failed" ? "待补考" : "尚未考试"}</span>
@@ -8572,6 +8711,21 @@
     }
     if (action === "open-learning-course") {
       openLearningCourse(target.dataset.lessonId);
+      return;
+    }
+    if (action === "start-learning-plan") {
+      const plan = learningPlans.find(
+        (item) => item.id === target.dataset.planId,
+      );
+      const courses = (plan?.courseIds || [])
+        .map((id) => learningCourses.find((course) => course.id === id))
+        .filter(Boolean);
+      const nextCourse =
+        courses.find(
+          (course) =>
+            learningRecord(course.id)?.status !== "completed",
+        ) || courses[0];
+      if (nextCourse) openLearningCourse(nextCourse.id);
       return;
     }
     if (action === "complete-learning") {
