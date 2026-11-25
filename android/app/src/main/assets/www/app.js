@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.16";
+  const APP_VERSION = "2026.11.25.17";
 
   const iconPaths = {
     home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
@@ -92,10 +92,21 @@
   }
 
   const roleLabels = {
-    hq: "总经理端",
+    hq: "区域经理端",
     supervisor: "督导工作台",
-    store: "门店端",
+    store: "门店小伙伴",
   };
+  const viewRoleByAccountRole = {
+    区域经理: "hq",
+    督导: "supervisor",
+    门店小伙伴: "store",
+  };
+
+  function normalizeAccountRole(role) {
+    if (role === "总经理") return "区域经理";
+    if (role === "门店人员" || role === "门店端") return "门店小伙伴";
+    return role;
+  }
 
   const templatesSeed = [
     {
@@ -445,7 +456,7 @@
             {
               id: "product-8",
               title: "商品库存：外采商品库存不超过近半月销售 5 倍",
-              hint: "且为最近一周订货，店长需说明原因",
+              hint: "且为最近一周订货，门店小伙伴需说明原因",
               photos: 2,
               severity: "high",
             },
@@ -737,7 +748,7 @@
           due: "今天 18:00",
           overdue: true,
           description:
-            "后场通往消防门的通道堆放了两摞冬装补货纸箱，现场通道宽度不足。已当面提醒店长，需立即清理并上传整改照片。",
+            "后场通往消防门的通道堆放了两摞冬装补货纸箱，现场通道宽度不足。已当面提醒门店小伙伴，需立即清理并上传整改照片。",
           reporter: "林小满",
           assignee: "陈思",
           createdAt: "11月 24日 17:26",
@@ -767,7 +778,7 @@
           due: "今天 12:00",
           overdue: false,
           description:
-            "橱窗右侧两盏射灯不亮，影响主推款展示。工程人员已更换驱动电源，店长已上传修复照片。",
+            "橱窗右侧两盏射灯不亮，影响主推款展示。工程人员已更换驱动电源，门店小伙伴已上传修复照片。",
           reporter: "周子航",
           assignee: "王倩",
           createdAt: "11月 23日 10:32",
@@ -1010,7 +1021,7 @@
           description:
             "巡店时发现店门口地面存在灰尘。门店已完成清扫并提交整改说明。",
           reporter: "黄庆",
-          assignee: "门店店长",
+          assignee: "门店小伙伴",
           createdAt: "2026-11-25",
           completedAt: "2026-11-25",
           completionNote: "已打扫",
@@ -1027,7 +1038,7 @@
           description:
             "主推畅销款部分尺码缺货，需确认库存并完成补货或提交特殊报备。",
           reporter: "黄庆",
-          assignee: "门店店长",
+          assignee: "门店小伙伴",
           createdAt: "2026-11-25",
         },
         {
@@ -1042,7 +1053,7 @@
           description:
             "部分主货架最外侧商品内缩，影响陈列面整齐度，已下发门店调整。",
           reporter: "黄庆",
-          assignee: "门店店长",
+          assignee: "门店小伙伴",
           createdAt: "2026-11-25",
         },
         {
@@ -1057,7 +1068,7 @@
           description:
             "迎宾玻璃右下角存在胶渍。门店已清洁并上传整改凭证，等待督导复核。",
           reporter: "黄庆",
-          assignee: "门店店长",
+          assignee: "门店小伙伴",
           createdAt: "2026-11-25",
         },
       ],
@@ -1068,7 +1079,7 @@
           short: "尚都",
           city: "商丘",
           address: "商丘区域 · 尚都国际",
-          manager: "店长",
+          manager: "门店小伙伴",
           managerInitials: "店",
           inspector: "黄庆",
           score: 98,
@@ -1088,7 +1099,7 @@
           short: "建业",
           city: "商丘",
           address: "商丘区域 · 建业壹号城邦",
-          manager: "店长",
+          manager: "门店小伙伴",
           managerInitials: "店",
           inspector: "黄庆",
           score: null,
@@ -1108,7 +1119,7 @@
           short: "睢阳",
           city: "商丘",
           address: "商丘区域 · 睢阳万达",
-          manager: "店长",
+          manager: "门店小伙伴",
           managerInitials: "店",
           inspector: "黄庆",
           score: null,
@@ -1128,7 +1139,7 @@
           short: "帝和",
           city: "商丘",
           address: "商丘区域 · 帝和温莎阳光",
-          manager: "店长",
+          manager: "门店小伙伴",
           managerInitials: "店",
           inspector: "黄庆",
           score: null,
@@ -1148,7 +1159,7 @@
           short: "团结",
           city: "商丘",
           address: "商丘区域 · 团结路步行街",
-          manager: "店长",
+          manager: "门店小伙伴",
           managerInitials: "店",
           inspector: "黄庆",
           score: null,
@@ -1168,7 +1179,7 @@
           short: "吾悦",
           city: "商丘",
           address: "商丘区域 · 吾悦广场",
-          manager: "店长",
+          manager: "门店小伙伴",
           managerInitials: "店",
           inspector: "黄庆",
           score: null,
@@ -1188,7 +1199,7 @@
           short: "睢县",
           city: "商丘",
           address: "商丘区域 · 睢县解放路",
-          manager: "店长",
+          manager: "门店小伙伴",
           managerInitials: "店",
           inspector: "黄庆",
           score: null,
@@ -1208,7 +1219,7 @@
           short: "虞城",
           city: "商丘",
           address: "商丘区域 · 虞城汇景江南",
-          manager: "店长",
+          manager: "门店小伙伴",
           managerInitials: "店",
           inspector: "黄庆",
           score: null,
@@ -1228,7 +1239,7 @@
           short: "金色",
           city: "商丘",
           address: "商丘区域 · 金色福园",
-          manager: "店长",
+          manager: "门店小伙伴",
           managerInitials: "店",
           inspector: "黄庆",
           score: null,
@@ -1248,7 +1259,7 @@
           short: "华夏",
           city: "商丘",
           address: "商丘区域 · 华夏路",
-          manager: "店长",
+          manager: "门店小伙伴",
           managerInitials: "店",
           inspector: "黄庆",
           score: null,
@@ -1267,7 +1278,7 @@
         {
           id: "AP-001",
           name: "张晓雨",
-          requestedRole: "门店端",
+          requestedRole: "门店小伙伴",
           store: "巴布豆商丘华夏路店",
           status: "pending",
           createdAt: "2026-11-25 14:20",
@@ -1275,7 +1286,7 @@
         {
           id: "AP-002",
           name: "黄庆",
-          requestedRole: "总经理",
+          requestedRole: "区域经理",
           store: "全区域",
           status: "approved",
           createdAt: "2026-11-25 09:10",
@@ -1304,6 +1315,9 @@
   }
 
   function normalizeAppState(target) {
+    if (typeof target.rolePreview !== "boolean") {
+      target.rolePreview = target.role !== "hq";
+    }
     target.route = target.route || {
       date: "2026-11-25",
       storeIds: [],
@@ -1314,12 +1328,14 @@
       ...store,
       status: store.status || "营业中",
       businessHours: store.businessHours || "10:00–22:00",
-      contact: store.contact || "门店人员",
-      manager: "门店人员",
+      contact: store.contact || "门店小伙伴",
+      manager: "门店小伙伴",
       managerInitials: "门",
     }));
     target.tasks = (target.tasks || []).map((task) => ({
       ...task,
+      inspector:
+        task.inspector === "门店人员" ? "门店小伙伴" : task.inspector,
       taskType:
         task.taskType || (task.templateId ? "inspection" : "operation"),
       assigneeRole:
@@ -1331,45 +1347,97 @@
           : task.status === "submitted"
             ? "pending_review"
             : "not_submitted"),
-      createdBy: task.createdBy || "督导现场",
+      createdBy:
+        normalizeAccountRole(task.createdBy) || "督导现场",
     }));
     target.issues = (target.issues || []).map((issue) => ({
       ...issue,
       assignee:
-        issue.assignee === "门店店长" || !issue.assignee
-          ? "门店人员"
-          : issue.assignee,
+        issue.assignee === "门店小伙伴" ||
+        issue.assignee === "门店人员" ||
+        issue.assignee === "门店店长" ||
+        !issue.assignee
+          ? "门店小伙伴"
+          : normalizeAccountRole(issue.assignee),
     }));
-    if (!target.accounts?.length) {
-      target.accounts = [
-        {
-          id: "ACC-HQ-001",
-          name: "黄庆",
-          phone: "已绑定总经理账号",
-          role: "总经理",
-          store: "全区域",
-          storeId: "",
-          status: "启用",
-        },
-        {
-          id: "ACC-SUP-001",
-          name: "王宁",
-          phone: "138****2016",
-          role: "督导",
-          store: "商丘区域",
-          storeId: "",
-          status: "启用",
-        },
-        {
-          id: "ACC-STORE-001",
-          name: "张晓雨",
-          phone: "139****0821",
-          role: "门店人员",
-          store: "巴布豆商丘华夏路店",
-          storeId: "st2",
-          status: "待启用",
-        },
-      ];
+    const defaultAccounts = [
+      {
+        id: "ACC-HQ-001",
+        name: "黄庆",
+        phone: "区域经理主账号",
+        role: "区域经理",
+        store: "全区域",
+        storeId: "",
+        status: "启用",
+        loginId: "admin",
+        pin: "888888",
+      },
+      {
+        id: "ACC-SUP-001",
+        name: "王宁",
+        phone: "138****2016",
+        role: "督导",
+        store: "商丘区域",
+        storeId: "",
+        status: "启用",
+        loginId: "supervisor",
+        pin: "666666",
+      },
+      {
+        id: "ACC-STORE-001",
+        name: "张晓雨",
+        phone: "139****0821",
+        role: "门店小伙伴",
+        store: "巴布豆商丘华夏路店",
+        storeId: "st2",
+        status: "启用",
+        loginId: "store",
+        pin: "111111",
+      },
+    ];
+    const sourceAccounts = target.accounts?.length
+      ? target.accounts
+      : defaultAccounts;
+    const usedLoginIds = new Set();
+    target.accounts = sourceAccounts.map((account, index) => {
+      const role = normalizeAccountRole(account.role);
+      const fallback =
+        defaultAccounts.find((item) => item.role === role) ||
+        defaultAccounts[index] ||
+        defaultAccounts[0];
+      let loginId = String(account.loginId || fallback.loginId || "user")
+        .trim()
+        .toLowerCase();
+      if (!loginId) loginId = `user${index + 1}`;
+      const originalLoginId = loginId;
+      let suffix = 2;
+      while (usedLoginIds.has(loginId)) {
+        loginId = `${originalLoginId}${suffix}`;
+        suffix += 1;
+      }
+      usedLoginIds.add(loginId);
+      return {
+        ...account,
+        role,
+        phone:
+          role === "区域经理" && account.phone === "已绑定总经理账号"
+            ? "区域经理主账号"
+            : account.phone,
+        loginId,
+        pin: String(account.pin || fallback.pin || "123456"),
+        status: account.status || "启用",
+      };
+    });
+    target.currentAccountId = target.accounts.some(
+      (account) => account.id === target.currentAccountId,
+    )
+      ? target.currentAccountId
+      : "";
+    target.authenticated = Boolean(
+      target.authenticated && target.currentAccountId,
+    );
+    if (!target.authenticated) {
+      target.rolePreview = false;
     }
     const addTaskIfMissing = (task) => {
       if (!target.tasks.some((item) => item.id === task.id)) {
@@ -1389,8 +1457,8 @@
       date: "28",
       month: "11月",
       dueLabel: "2026-11-28",
-      inspector: "门店人员",
-      createdBy: "总经理",
+      inspector: "门店小伙伴",
+      createdBy: "区域经理",
       description: "检查灭火器有效期、压力表和消防通道，完成后提交文字与照片。",
     });
     addTaskIfMissing({
@@ -1406,8 +1474,8 @@
       date: "26",
       month: "11月",
       dueLabel: "2026-11-26",
-      inspector: "门店人员",
-      createdBy: "总经理",
+      inspector: "门店小伙伴",
+      createdBy: "区域经理",
       description: "将当前会员活动物料调整到位，并提交现场照片。",
     });
     addTaskIfMissing({
@@ -1424,7 +1492,7 @@
       month: "11月",
       dueLabel: "2026-11-26",
       inspector: "黄庆",
-      createdBy: "总经理",
+      createdBy: "区域经理",
       description: "汇总本周销售、毛利、巡店与整改情况，提交复盘结果。",
     });
     addTaskIfMissing({
@@ -1440,8 +1508,8 @@
       date: "25",
       month: "11月",
       dueLabel: "2026-11-25",
-      inspector: "门店人员",
-      createdBy: "总经理",
+      inspector: "门店小伙伴",
+      createdBy: "区域经理",
       description: "更换入口磨损地垫。",
       completionNote: "旧地垫已撤除，新防滑地垫已铺设完成。",
       completedAt: "2026-11-25",
@@ -1940,10 +2008,17 @@
   }
 
   let activeCameraStream = null;
+  let activeCameraZoom = {
+    value: 1,
+    min: 1,
+    max: 3,
+    hardware: false,
+  };
 
   function closeCameraCapture() {
     activeCameraStream?.getTracks().forEach((track) => track.stop());
     activeCameraStream = null;
+    activeCameraZoom = { value: 1, min: 1, max: 3, hardware: false };
     const root = document.getElementById("camera-root");
     if (root) root.innerHTML = "";
   }
@@ -1973,6 +2048,12 @@
           </div>
           <div class="camera-video-wrap">
             <video id="cameraVideo" autoplay playsinline muted></video>
+            <div class="camera-zoom-bar">
+              <button data-action="camera-zoom-step" data-step="-1" type="button" aria-label="缩小">${icon("minus", "icon-sm")}</button>
+              <span id="cameraZoomLabel">1.0×</span>
+              <input id="cameraZoom" type="range" min="1" max="3" step="0.1" value="1" aria-label="调整相机变焦" />
+              <button data-action="camera-zoom-step" data-step="1" type="button" aria-label="放大">${icon("plus", "icon-sm")}</button>
+            </div>
             <div class="camera-watermark-preview">
               <span>巡店现场</span>
               <strong>${escapeHtml(store.name)}</strong>
@@ -1997,8 +2078,9 @@
         activeCameraStream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 1280 },
+            height: { ideal: 960 },
+            aspectRatio: { ideal: 4 / 3 },
           },
           audio: false,
         });
@@ -2013,10 +2095,58 @@
         video.srcObject = activeCameraStream;
         await video.play().catch(() => {});
       }
+      const track = activeCameraStream.getVideoTracks?.()[0];
+      const capabilities = track?.getCapabilities?.() || {};
+      if (capabilities.zoom) {
+        activeCameraZoom = {
+          value: Math.max(1, capabilities.zoom.min || 1),
+          min: Math.max(1, capabilities.zoom.min || 1),
+          max: Math.min(capabilities.zoom.max || 4, 8),
+          hardware: true,
+        };
+        await applyCameraZoom(activeCameraZoom.value);
+      }
+      updateCameraZoomUi();
     } catch {
       closeCameraCapture();
       showToast("无法调用摄像头，请检查相机权限并使用手机打开", "error");
     }
+  }
+
+  function updateCameraZoomUi() {
+    const range = document.getElementById("cameraZoom");
+    const label = document.getElementById("cameraZoomLabel");
+    if (range) {
+      range.min = String(activeCameraZoom.min);
+      range.max = String(activeCameraZoom.max);
+      range.value = String(activeCameraZoom.value);
+    }
+    if (label) {
+      label.textContent = `${activeCameraZoom.value.toFixed(1)}×`;
+    }
+  }
+
+  async function applyCameraZoom(nextValue) {
+    const value = Math.min(
+      activeCameraZoom.max,
+      Math.max(activeCameraZoom.min, Number(nextValue) || 1),
+    );
+    activeCameraZoom.value = value;
+    const track = activeCameraStream?.getVideoTracks?.()[0];
+    if (activeCameraZoom.hardware && track?.applyConstraints) {
+      try {
+        await track.applyConstraints({ advanced: [{ zoom: value }] });
+      } catch {
+        activeCameraZoom.hardware = false;
+      }
+    }
+    const video = document.getElementById("cameraVideo");
+    if (video) {
+      video.style.transform = activeCameraZoom.hardware
+        ? ""
+        : `scale(${value})`;
+    }
+    updateCameraZoomUi();
   }
 
   async function captureCameraPhoto() {
@@ -2037,7 +2167,24 @@
     canvas.width = width;
     canvas.height = height;
     const context = canvas.getContext("2d");
-    context.drawImage(video, 0, 0, width, height);
+    const digitalZoom = activeCameraZoom.hardware
+      ? 1
+      : activeCameraZoom.value;
+    const sourceWidth = video.videoWidth / digitalZoom;
+    const sourceHeight = video.videoHeight / digitalZoom;
+    const sourceX = (video.videoWidth - sourceWidth) / 2;
+    const sourceY = (video.videoHeight - sourceHeight) / 2;
+    context.drawImage(
+      video,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      width,
+      height,
+    );
 
     const task = taskById(options.taskId);
     const store = storeById(task.storeId);
@@ -2340,9 +2487,35 @@
   }
 
   function renderRoleSelect(extraClass = "") {
+    const account = currentAccount();
+    if (!account || account.role !== "区域经理") {
+      return `
+        <div class="role-switcher role-switcher-locked ${extraClass}">
+          ${icon("shield", "icon-sm")}
+          <span>${roleLabels[state.role]}</span>
+        </div>
+      `;
+    }
+    if (state.role !== "hq") {
+      if (state.rolePreview) {
+        return `
+          <div class="role-switcher ${extraClass}">
+            <button class="role-preview-exit" data-action="exit-role-preview" type="button">
+              ${icon("arrow-up-right", "icon-sm")} 返回区域经理
+            </button>
+          </div>
+        `;
+      }
+      return `
+        <div class="role-switcher role-switcher-locked ${extraClass}">
+          ${icon("shield", "icon-sm")}
+          <span>${roleLabels[state.role]}</span>
+        </div>
+      `;
+    }
     return `
       <div class="role-switcher ${extraClass}">
-        <select class="role-select" aria-label="切换应用角色" data-role-select>
+        <select class="role-select" aria-label="区域经理切换查看视角" data-role-select>
           ${Object.entries(roleLabels)
             .map(
               ([value, label]) =>
@@ -2460,11 +2633,13 @@
             <p>优先完成高风险门店复检，今天还有 ${openTaskCount()} 项任务待处理。</p>
           </div>
           <div class="sidebar-user">
-            ${renderAvatar("黄庆", "avatar-green")}
+            ${renderAvatar(currentAccount()?.name || "用户", "avatar-green")}
             <div class="sidebar-user-copy">
-              <div class="sidebar-user-name">黄庆</div>
+              <div class="sidebar-user-name">${escapeHtml(currentAccount()?.name || "用户")}</div>
               <div class="sidebar-user-role">${
-                state.role === "supervisor" ? "商丘区域督导" : "总经理"
+                state.role === "supervisor"
+                  ? "商丘区域督导"
+                  : currentAccount()?.role || "区域经理"
               }</div>
             </div>
             <button class="icon-button" style="width: 30px; height: 30px; background: transparent; border: 0; color: #9ba4ae" data-action="open-help" aria-label="帮助">
@@ -2515,7 +2690,8 @@
             <span class="notification-dot"></span>
           </button>
           ${isNativeApp ? "" : `<a class="icon-button" href="./xundian-cloud-native.apk" download aria-label="下载 Android App" title="下载 Android App">${icon("download")}</a>`}
-          ${renderAvatar("黄庆", "avatar-green")}
+          <button class="logout-text-button" data-action="logout">退出</button>
+          ${renderAvatar(currentAccount()?.name || "用户", "avatar-green")}
         </div>
       </header>
     `;
@@ -2863,7 +3039,7 @@
                       sales,
                     )}、毛利 ${formatMoney(
                       grossProfit,
-                    )}；当前有 ${pendingReviewCount()} 项任务待总经理审核。`
+                    )}；当前有 ${pendingReviewCount()} 项任务待区域经理审核。`
                 }</p>
                 <div class="hero-actions">
                   <button class="button button-primary" data-action="${
@@ -3216,7 +3392,7 @@
                           ? `巡检得分 ${task.resultScore} · 已审核`
                           : "任务已审核"
                         : task.status === "submitted"
-                          ? "等待总经理审核"
+                          ? "等待区域经理审核"
                           : `完成 ${progress}%`
                     }</span>
                   </div>
@@ -3263,7 +3439,7 @@
             <h1>${
               state.role === "supervisor" ? "我的任务" : "任务中心"
             }</h1>
-            <p>总经理下发督导或门店任务，执行人提交完成结果，再由上级审核关闭。</p>
+            <p>区域经理下发督导或门店任务，执行人提交完成结果，再由上级审核关闭。</p>
           </div>
           <div class="header-actions">${renderHeaderActions()}</div>
         </div>
@@ -3355,7 +3531,7 @@
         const focusMatch =
           ui.issueFocus === "all" ||
           (ui.issueFocus === "high" && issue.severity === "high") ||
-          (ui.issueFocus === "mine" && issue.assignee === "门店人员");
+          (ui.issueFocus === "mine" && issue.assignee === "门店小伙伴");
         return focusMatch && (!query || text.includes(query));
       });
     const columns = [
@@ -3413,7 +3589,7 @@
       const focusMatch =
         ui.issueFocus === "all" ||
         (ui.issueFocus === "high" && issue.severity === "high") ||
-        (ui.issueFocus === "mine" && issue.assignee === "门店人员");
+        (ui.issueFocus === "mine" && issue.assignee === "门店小伙伴");
       return focusMatch && (!query || text.includes(query));
     });
     const columns = [
@@ -3613,7 +3789,7 @@
               ${icon("search", "icon-sm")}
               <input id="storeSearch" type="search" value="${escapeHtml(
                 ui.storeQuery,
-              )}" placeholder="搜索门店、城市或门店人员…" />
+              )}" placeholder="搜索门店、城市或门店小伙伴…" />
             </label>
           </div>
           <div class="table-wrap">
@@ -3646,7 +3822,7 @@
           <div class="page-heading">
             <div class="eyebrow">Store configuration</div>
             <h1>门店设置</h1>
-            <p>维护 10 家门店的营业状态、营业时间、门店人员与基础资料。</p>
+            <p>维护 10 家门店的营业状态、营业时间、门店小伙伴与基础资料。</p>
           </div>
           <div class="header-actions">${renderHeaderActions()}</div>
         </div>
@@ -3660,7 +3836,7 @@
           <div class="data-panel-toolbar">
             <div class="data-panel-toolbar-copy">
               <h3>门店基础设置</h3>
-              <p>门店人员账号只绑定门店，不再区分店长或导购</p>
+              <p>门店小伙伴账号只绑定门店，不区分具体岗位</p>
             </div>
           </div>
           <div class="table-wrap">
@@ -3671,7 +3847,7 @@
                   .map((store) => {
                     const accountCount = state.accounts.filter(
                       (account) =>
-                        account.role === "门店人员" &&
+                        account.role === "门店小伙伴" &&
                         account.storeId === store.id,
                     ).length;
                     return `
@@ -3709,9 +3885,9 @@
 
   function renderAccountsPage() {
     const roleCounts = {
-      hq: state.accounts.filter((item) => item.role === "总经理").length,
+      hq: state.accounts.filter((item) => item.role === "区域经理").length,
       supervisor: state.accounts.filter((item) => item.role === "督导").length,
-      store: state.accounts.filter((item) => item.role === "门店人员").length,
+      store: state.accounts.filter((item) => item.role === "门店小伙伴").length,
     };
     return `
       <section>
@@ -3719,14 +3895,14 @@
           <div class="page-heading">
             <div class="eyebrow">People & accounts</div>
             <h1>人员账号设置</h1>
-            <p>总部、督导按职责授权；门店人员统一绑定门店，不区分店长和导购。</p>
+            <p>区域经理、督导按职责授权；门店小伙伴统一绑定门店，不区分门店岗位。</p>
           </div>
           <div class="header-actions">${renderHeaderActions()}</div>
         </div>
         <div class="issue-summary-grid">
-          <article class="summary-card"><span class="summary-icon" style="--accent:var(--brand);--tint:var(--brand-soft)">${icon("shield")}</span><span class="summary-copy"><strong>${roleCounts.hq}</strong><span>总经理</span></span></article>
+          <article class="summary-card"><span class="summary-icon" style="--accent:var(--brand);--tint:var(--brand-soft)">${icon("shield")}</span><span class="summary-copy"><strong>${roleCounts.hq}</strong><span>区域经理</span></span></article>
           <article class="summary-card"><span class="summary-icon" style="--accent:var(--blue);--tint:var(--blue-soft)">${icon("clipboard")}</span><span class="summary-copy"><strong>${roleCounts.supervisor}</strong><span>督导</span></span></article>
-          <article class="summary-card"><span class="summary-icon" style="--accent:var(--green);--tint:var(--green-soft)">${icon("store")}</span><span class="summary-copy"><strong>${roleCounts.store}</strong><span>门店人员</span></span></article>
+          <article class="summary-card"><span class="summary-icon" style="--accent:var(--green);--tint:var(--green-soft)">${icon("store")}</span><span class="summary-copy"><strong>${roleCounts.store}</strong><span>门店小伙伴</span></span></article>
           <article class="summary-card"><span class="summary-icon" style="--accent:var(--orange);--tint:var(--orange-soft)">${icon("clock")}</span><span class="summary-copy"><strong>${state.accounts.filter((item) => item.status === "待启用").length}</strong><span>待启用</span></span></article>
         </div>
         <div class="data-panel">
@@ -3735,7 +3911,7 @@
           </div>
           <div class="table-wrap">
             <table class="data-table">
-              <thead><tr><th>人员</th><th>角色</th><th>手机号/登录账号</th><th>门店/区域</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th>人员</th><th>角色</th><th>登录账号 / 手机号</th><th>门店/区域</th><th>状态</th><th>操作</th></tr></thead>
               <tbody>
                 ${state.accounts
                   .map(
@@ -3743,27 +3919,29 @@
                       <tr style="cursor:default">
                         <td><div class="person-cell">${renderAvatar(
                           account.name,
-                          account.role === "门店人员"
+                          account.role === "门店小伙伴"
                             ? "avatar-green"
                             : account.role === "督导"
                               ? "avatar-blue"
                               : "",
                         )}<strong>${escapeHtml(account.name)}</strong></div></td>
                         <td><span class="badge ${
-                          account.role === "总经理"
+                          account.role === "区域经理"
                             ? "purple"
                             : account.role === "督导"
                               ? "info"
                               : "success"
                         }">${escapeHtml(account.role)}</span></td>
-                        <td>${escapeHtml(account.phone)}</td>
+                        <td><strong>${escapeHtml(account.loginId)}</strong><br><span class="muted-text">${escapeHtml(account.phone)}</span></td>
                         <td>${escapeHtml(account.store)}</td>
                         <td><span class="badge ${
                           account.status === "启用" ? "success" : "warning"
                         }">${escapeHtml(account.status)}</span></td>
-                        <td><button class="button button-secondary button-sm" data-action="toggle-account" data-account-id="${
+                        <td><div class="table-action-group"><button class="button button-secondary button-sm" data-action="toggle-account" data-account-id="${
                           account.id
-                        }">${account.status === "启用" ? "停用" : "启用"}</button></td>
+                        }">${account.status === "启用" ? "停用" : "启用"}</button><button class="button button-ghost button-sm" data-action="reset-account-pin" data-account-id="${
+                          account.id
+                        }">重置密码</button></div></td>
                       </tr>
                     `,
                   )
@@ -3801,7 +3979,7 @@
         <div class="report-summary">
           <section class="panel ranking-panel">
             <div class="panel-header" style="padding:0">
-              <div class="panel-heading"><h3>任务审核</h3><p>完成情况需由总经理审核后关闭</p></div>
+              <div class="panel-heading"><h3>任务审核</h3><p>完成情况需由区域经理审核后关闭</p></div>
               <span class="badge ${reviewTasks.length ? "purple" : "success"}">${reviewTasks.length ? "待处理" : "已清空"}</span>
             </div>
             <div class="ranking-list">
@@ -3835,7 +4013,7 @@
             </div>
             <div class="insight-list">
               <button class="insight-item" data-action="navigate" data-page="store-settings"><span class="insight-number">1</span><p><strong>门店设置</strong><br>营业时间、状态与门店资料</p></button>
-              <button class="insight-item" data-action="navigate" data-page="accounts"><span class="insight-number">2</span><p><strong>人员账号设置</strong><br>总部、督导、门店人员与门店绑定</p></button>
+              <button class="insight-item" data-action="navigate" data-page="accounts"><span class="insight-number">2</span><p><strong>人员账号设置</strong><br>区域经理、督导、门店小伙伴与门店绑定</p></button>
               <button class="insight-item" data-action="check-update"><span class="insight-number">3</span><p><strong>应用更新中心</strong><br>检测新版本并让在线用户自动刷新</p></button>
               ${isNativeApp ? `<button class="insight-item" data-action="native-update"><span class="insight-number">4</span><p><strong>下载原生版更新</strong><br>发现新版本后会发系统通知，也可在这里主动下载</p></button>` : `<a class="insight-item" href="./xundian-cloud-native.apk" download><span class="insight-number">4</span><p><strong>Android 原生安装包</strong><br>本地内置应用资源，不再依赖 Chrome 或跳出浏览器</p></a>`}
             </div>
@@ -4390,7 +4568,7 @@
       <div class="store-mobile-content">
         <div class="mobile-greeting">
           <h1>下午好，门店伙伴</h1>
-          <p>${escapeHtml(store.name)} · 门店人员统一工作台</p>
+          <p>${escapeHtml(store.name)} · 门店小伙伴统一工作台</p>
         </div>
 
         <section class="mobile-score-card">
@@ -4457,14 +4635,14 @@
                         }">${statusMeta(task.status).label}</span></div>
                         <div class="mobile-issue-meta"><span>${escapeHtml(
                           taskTypeLabel(task),
-                        )} · ${escapeHtml(task.createdBy || "总经理")}下发</span><span>${escapeHtml(
+                        )} · ${escapeHtml(task.createdBy || "区域经理")}下发</span><span>${escapeHtml(
                           task.dueLabel,
                         )}</span></div>
                       </article>
                     `,
                   )
                   .join("")
-              : `<div class="mobile-issue-card"><div class="mobile-issue-head"><strong>暂无门店运营任务</strong></div><div class="mobile-issue-meta"><span>总经理下发后会显示在这里</span>${icon(
+              : `<div class="mobile-issue-card"><div class="mobile-issue-head"><strong>暂无门店运营任务</strong></div><div class="mobile-issue-meta"><span>区域经理下发后会显示在这里</span>${icon(
                   "check-circle",
                   "icon-sm",
                 )}</div></div>`
@@ -4585,7 +4763,7 @@
       <div class="store-mobile-content">
         <div class="mobile-greeting">
           <h1>门店任务</h1>
-          <p>只按所属门店接收任务，不区分店长和导购</p>
+          <p>只按所属门店接收任务，不区分门店岗位</p>
         </div>
         <section class="mobile-section" style="margin-top:4px">
           ${
@@ -4608,7 +4786,7 @@
                         </div>
                         <div class="mobile-issue-meta">
                           <span>${escapeHtml(taskTypeLabel(task))} · ${escapeHtml(
-                            task.createdBy || "总经理",
+                            task.createdBy || "区域经理",
                           )}下发</span>
                           <span>${icon("clock", "icon-sm")} ${escapeHtml(
                             task.dueLabel,
@@ -4630,7 +4808,7 @@
                   .join("")
               : `<div class="mobile-placeholder"><div class="empty-icon">${icon(
                   "list-checks",
-                )}</div><h2>暂无门店任务</h2><p>总经理下发运营任务后会显示在这里。</p></div>`
+                )}</div><h2>暂无门店任务</h2><p>区域经理下发运营任务后会显示在这里。</p></div>`
           }
         </section>
       </div>
@@ -4697,7 +4875,7 @@
             <div class="detail-cell"><span>所在城市</span><strong>${escapeHtml(
               store.city,
             )}</strong></div>
-            <div class="detail-cell"><span>门店人员</span><strong>${escapeHtml(
+            <div class="detail-cell"><span>门店小伙伴</span><strong>${escapeHtml(
               store.manager,
             )}</strong></div>
             <div class="detail-cell"><span>负责督导</span><strong>${escapeHtml(
@@ -4768,7 +4946,10 @@
     return `
       <div class="store-portal-wrap">
         <div class="store-portal-role" style="position: fixed; top: 22px; right: 24px; z-index: 20">
-          ${renderRoleSelect()}
+          <div class="store-portal-actions">
+            ${renderRoleSelect()}
+            <button class="logout-text-button" data-action="logout">退出</button>
+          </div>
         </div>
         <div class="phone-shell">
           <div class="phone-screen">
@@ -4777,7 +4958,7 @@
                 <div class="store-mobile-brand">${icon("check-circle", "icon-sm")}</div>
                 <div class="store-mobile-heading">
                   <strong>${escapeHtml(store.name)}</strong>
-                  <span>门店人员工作台 · 今日任务</span>
+                  <span>${escapeHtml(currentAccount()?.name || "门店小伙伴")} · 今日任务</span>
                 </div>
                 ${renderAvatar(store.manager, "avatar-pink")}
               </header>
@@ -4790,8 +4971,63 @@
     `;
   }
 
+  function currentAccount() {
+    return state.accounts.find(
+      (account) => account.id === state.currentAccountId,
+    );
+  }
+
+  function applyAccountAccess(account) {
+    const accountView = viewRoleByAccountRole[account.role] || "store";
+    state.role = accountView;
+    state.rolePreview = false;
+    if (accountView === "store") {
+      state.storeId = account.storeId || state.storeId;
+      ui.mobileTab = "home";
+    } else {
+      state.page = "overview";
+      ui.mobileTab = "home";
+    }
+  }
+
+  function renderLoginScreen() {
+    const root = document.getElementById("app");
+    root.innerHTML = `
+      <div class="login-shell">
+        <div class="login-card">
+          <div class="login-brand-mark">${icon("check-circle")}</div>
+          <div class="eyebrow">Store operations</div>
+          <h1>登录巡店云</h1>
+          <p class="login-intro">区域经理、督导和门店小伙伴使用各自账号进入对应工作台。</p>
+          <form id="loginForm" class="login-form">
+            <label>登录账号<input class="form-control" name="loginId" autocomplete="username" autocapitalize="none" required placeholder="请输入账号" /></label>
+            <label>登录密码<input class="form-control" name="pin" type="password" inputmode="numeric" autocomplete="current-password" required placeholder="请输入密码" /></label>
+            <button class="button button-primary login-submit" type="submit">${icon("arrow-right", "icon-sm")} 登录</button>
+          </form>
+          <div class="login-footnote">${icon("shield", "icon-sm")} 登录后会按账号角色限制可访问的工作台，初始账号请向区域经理获取</div>
+        </div>
+      </div>
+    `;
+    root.setAttribute("aria-busy", "false");
+  }
+
   function renderApp() {
     const root = document.getElementById("app");
+    const account = currentAccount();
+    if (!state.authenticated || !account) {
+      renderLoginScreen();
+      return;
+    }
+    if (account.role !== "区域经理") {
+      applyAccountAccess(account);
+    }
+    if (
+      account.role === "区域经理" &&
+      !["hq", "supervisor", "store"].includes(state.role)
+    ) {
+      state.role = "hq";
+      state.rolePreview = false;
+    }
     root.innerHTML =
       state.role === "store" ? renderStorePortal() : renderDesktopPage();
     root.setAttribute("aria-busy", "false");
@@ -5010,7 +5246,7 @@
             </div>
           </div>
           <div class="modal-footer">
-            <span class="footer-info">路线由督导本人规划，不需要总经理派发</span>
+            <span class="footer-info">路线由督导本人规划，不需要区域经理派发</span>
             <button class="button button-secondary" data-action="close-modal">取消</button>
             <button class="button button-primary" data-action="save-route" ${
               ui.routeDraft.length ? "" : "disabled"
@@ -5033,7 +5269,7 @@
             <div>
               <div class="eyebrow">督导主动巡店</div>
               <h2 id="startVisitTitle">发起本次巡店</h2>
-              <p>督导到店后现场发起，不经过总经理派单。</p>
+              <p>督导到店后现场发起，不经过区域经理派单。</p>
             </div>
             <button class="close-button" data-action="close-modal" aria-label="关闭">${icon("x")}</button>
           </div>
@@ -5111,7 +5347,7 @@
           <div class="modal-header">
             <div><div class="eyebrow">门店设置</div><h2 id="storeSettingTitle">${escapeHtml(
               store.name,
-            )}</h2><p>门店人员按门店统一识别，不再区分店长与导购。</p></div>
+            )}</h2><p>门店小伙伴按门店统一识别，不再区分门店岗位。</p></div>
             <button class="close-button" data-action="close-modal">${icon("x")}</button>
           </div>
           <form id="storeSettingForm">
@@ -5152,7 +5388,7 @@
       <div class="modal-backdrop">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="newStoreTitle">
           <div class="modal-header">
-            <div><div class="eyebrow">门店设置</div><h2 id="newStoreTitle">新增门店</h2><p>新增后可在人员账号中绑定门店人员。</p></div>
+            <div><div class="eyebrow">门店设置</div><h2 id="newStoreTitle">新增门店</h2><p>新增后可在人员账号中绑定门店小伙伴。</p></div>
             <button class="close-button" data-action="close-modal">${icon("x")}</button>
           </div>
           <form id="newStoreForm">
@@ -5162,7 +5398,7 @@
                 <div class="form-field"><label>所在城市</label><input class="form-control" name="city" value="商丘" /></div>
                 <div class="form-field"><label>营业状态</label><select class="form-control" name="status"><option>营业中</option><option>暂停营业</option></select></div>
                 <div class="form-field"><label>营业时间</label><input class="form-control" name="businessHours" value="10:00–22:00" /></div>
-                <div class="form-field"><label>门店联系人</label><input class="form-control" name="contact" value="门店人员" /></div>
+                <div class="form-field"><label>门店联系人</label><input class="form-control" name="contact" value="门店小伙伴" /></div>
                 <div class="form-field"><label>门店电话</label><input class="form-control" name="phone" placeholder="选填" /></div>
                 <div class="form-field"><label>督导</label><input class="form-control" name="inspector" value="黄庆" /></div>
                 <div class="form-field full"><label>门店地址</label><input class="form-control" name="address" required placeholder="填写商场、楼层或街道地址" /></div>
@@ -5203,22 +5439,24 @@
       <div class="modal-backdrop">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="addAccountTitle">
           <div class="modal-header">
-            <div><div class="eyebrow">人员账号</div><h2 id="addAccountTitle">新增人员账号</h2><p>门店人员只选择所属门店，不设置店长或导购身份。</p></div>
+            <div><div class="eyebrow">人员账号</div><h2 id="addAccountTitle">新增人员账号</h2><p>门店小伙伴只选择所属门店，不设置额外岗位身份。</p></div>
             <button class="close-button" data-action="close-modal">${icon("x")}</button>
           </div>
           <form id="accountForm">
             <div class="modal-body">
               <div class="form-grid">
                 <div class="form-field"><label>姓名</label><input class="form-control" name="name" required /></div>
-                <div class="form-field"><label>手机号 / 登录账号</label><input class="form-control" name="phone" required /></div>
-                <div class="form-field"><label>账号角色</label><select class="form-control" name="role"><option>门店人员</option><option>督导</option><option>总经理</option></select></div>
+                <div class="form-field"><label>手机号</label><input class="form-control" name="phone" inputmode="tel" required /></div>
+                <div class="form-field"><label>登录账号</label><input class="form-control" name="loginId" autocomplete="off" required /></div>
+                <div class="form-field"><label>登录密码</label><input class="form-control" name="pin" type="password" minlength="6" autocomplete="new-password" required /></div>
+                <div class="form-field"><label>账号角色</label><select class="form-control" name="role"><option>门店小伙伴</option><option>督导</option><option>区域经理</option></select></div>
                 <div class="form-field"><label>所属门店 / 区域</label><select class="form-control" name="storeId"><option value="">全区域</option>${state.stores
                   .map(
                     (store) =>
                       `<option value="${store.id}">${escapeHtml(store.name)}</option>`,
                   )
                   .join("")}</select></div>
-                <div class="form-field full"><label>初始状态</label><select class="form-control" name="status"><option>启用</option><option>待启用</option></select><div class="form-hint">门店人员账号不区分店长和导购，登录后统一进入所属门店工作台。</div></div>
+                <div class="form-field full"><label>初始状态</label><select class="form-control" name="status"><option>启用</option><option>待启用</option></select><div class="form-hint">门店小伙伴账号不区分门店岗位，登录后统一进入所属门店工作台。</div></div>
               </div>
             </div>
             <div class="modal-footer"><button type="button" class="button button-secondary" data-action="close-modal">取消</button><button type="submit" class="button button-primary">新增账号</button></div>
@@ -5237,7 +5475,7 @@
       <div class="modal-backdrop">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="assignTaskTitle">
           <div class="modal-header">
-            <div><div class="eyebrow">总经理下发</div><h2 id="assignTaskTitle">下发任务</h2><p>可下发给督导执行，也可直接下发给门店完成运营任务。完成后统一由总经理审核。</p></div>
+            <div><div class="eyebrow">区域经理下发</div><h2 id="assignTaskTitle">下发任务</h2><p>可下发给督导执行，也可直接下发给门店完成运营任务。完成后统一由区域经理审核。</p></div>
             <button class="close-button" data-action="close-modal">${icon("x")}</button>
           </div>
           <form id="assignTaskForm">
@@ -5326,7 +5564,7 @@
                   : ""
               }
             </div>
-            <div class="modal-footer"><span class="footer-info">提交后由总经理审核</span><button type="button" class="button button-secondary" data-action="close-modal">取消</button><button type="submit" class="button button-primary">提交审核</button></div>
+            <div class="modal-footer"><span class="footer-info">提交后由区域经理审核</span><button type="button" class="button button-secondary" data-action="close-modal">取消</button><button type="submit" class="button button-primary">提交审核</button></div>
           </form>
         </div>
       </div>
@@ -5358,7 +5596,7 @@
           <div class="modal-body">
             <div class="detail-grid">
               <div class="detail-cell"><span>下发人</span><strong>${escapeHtml(
-                task.createdBy || "总经理",
+                task.createdBy || "区域经理",
               )}</strong></div>
               <div class="detail-cell"><span>完成期限</span><strong>${escapeHtml(
                 task.dueLabel,
@@ -6096,7 +6334,7 @@
               <div class="detail-cell"><span>所属区域</span><strong>商丘区域 · ${escapeHtml(
                 store.city,
               )}</strong></div>
-              <div class="detail-cell"><span>门店人员</span><strong>${escapeHtml(
+              <div class="detail-cell"><span>门店小伙伴</span><strong>${escapeHtml(
                 store.manager,
               )}</strong></div>
               <div class="detail-cell"><span>巡检模板</span><strong>${escapeHtml(
@@ -6223,7 +6461,7 @@
               )} · ${escapeHtml(issue.reporter)}</span></div>
               ${
                 issue.status !== "pending"
-                  ? `<div class="timeline-item done"><p>门店人员已开始处理，责任人：${escapeHtml(
+                  ? `<div class="timeline-item done"><p>门店小伙伴已开始处理，责任人：${escapeHtml(
                       issue.assignee,
                     )}</p><span>处理中</span></div>`
                   : ""
@@ -6286,7 +6524,7 @@
             <div class="mobile-score-meta"><span>门店状态<strong>${Number.isFinite(store.score) ? "已巡检" : "待巡检"}</strong></span><span>待整改<strong>${store.issues} 项</strong></span></div>
           </div>
           <div class="detail-grid" style="margin-top: 18px">
-            <div class="detail-cell"><span>门店人员</span><strong>${escapeHtml(
+            <div class="detail-cell"><span>门店小伙伴</span><strong>${escapeHtml(
               store.manager,
             )}</strong></div>
             <div class="detail-cell"><span>负责督导</span><strong>${escapeHtml(
@@ -6416,7 +6654,7 @@
     task.resultScore = score;
     task.completedAt = "2026-11-25";
     const store = storeById(task.storeId);
-    task.completionNote = `本次巡店得分 ${score}，等待总经理审核。`;
+    task.completionNote = `本次巡店得分 ${score}，等待区域经理审核。`;
     const createdIssues = [];
     fail.forEach((item) => {
       const issueId = `IS-${Math.floor(1100 + Math.random() * 800)}`;
@@ -6451,7 +6689,7 @@
     renderApp();
     notifyDevice(
       "巡店报告已提交",
-      `${store.name} 巡检得分 ${score}，等待总经理审核`,
+      `${store.name} 巡检得分 ${score}，等待区域经理审核`,
       `inspection-submit:${task.id}`,
     );
     showToast(
@@ -6595,6 +6833,19 @@
   }
 
   function navigate(page) {
+    const managerOnlyPages = [
+      "management",
+      "approvals",
+      "accounts",
+      "store-settings",
+    ];
+    if (
+      managerOnlyPages.includes(page) &&
+      currentAccount()?.role !== "区域经理"
+    ) {
+      showToast("当前账号没有访问该管理页面的权限", "error");
+      return;
+    }
     state.page = page;
     saveState();
     closeDrawer();
@@ -6619,8 +6870,29 @@
     if (!target) return;
     const action = target.dataset.action;
 
+    if (action === "logout") {
+      state.authenticated = false;
+      state.rolePreview = false;
+      saveState();
+      closeModal();
+      closeDrawer();
+      closeCameraCapture();
+      renderApp();
+      showToast("已退出登录");
+      return;
+    }
     if (action === "navigate") {
       navigate(target.dataset.page);
+      return;
+    }
+    if (action === "exit-role-preview") {
+      state.role = "hq";
+      state.rolePreview = false;
+      state.page = "overview";
+      ui.mobileTab = "home";
+      saveState();
+      renderApp();
+      showToast("已返回区域经理视角");
       return;
     }
     if (action === "open-inspection") {
@@ -6700,6 +6972,11 @@
     }
     if (action === "capture-camera") {
       captureCameraPhoto();
+      return;
+    }
+    if (action === "camera-zoom-step") {
+      const step = Number(target.dataset.step || 0) * 0.2;
+      applyCameraZoom(activeCameraZoom.value + step);
       return;
     }
     if (
@@ -6801,6 +7078,13 @@
         (item) => item.id === target.dataset.accountId,
       );
       if (!account) return;
+      if (
+        account.id === state.currentAccountId &&
+        account.status === "启用"
+      ) {
+        showToast("当前登录账号不能停用，请先切换账号", "error");
+        return;
+      }
       account.status = account.status === "启用" ? "停用" : "启用";
       saveState();
       target.textContent = account.status === "启用" ? "停用" : "启用";
@@ -6814,6 +7098,25 @@
         statusBadge.textContent = account.status;
       }
       showToast(`账号已${account.status === "启用" ? "启用" : "停用"}`);
+      return;
+    }
+    if (action === "reset-account-pin") {
+      const account = state.accounts.find(
+        (item) => item.id === target.dataset.accountId,
+      );
+      if (!account) return;
+      const newPin = window.prompt(
+        `为「${account.name}」设置新登录密码（至少 6 位）`,
+      );
+      if (newPin === null) return;
+      const pin = String(newPin).trim();
+      if (pin.length < 6) {
+        showToast("登录密码至少 6 位", "error");
+        return;
+      }
+      account.pin = pin;
+      saveState();
+      showToast(`「${account.name}」的登录密码已更新`);
       return;
     }
     if (action === "close-modal") {
@@ -6939,7 +7242,7 @@
       return;
     }
     if (action === "assign-issue") {
-      showToast("已通知对应门店人员处理该问题");
+      showToast("已通知对应门店小伙伴处理该问题");
       return;
     }
     if (action === "filter-approvals") {
@@ -7016,9 +7319,9 @@
             </div>
             <div class="modal-body">
               <div class="insight-list">
-                <div class="insight-item"><span class="insight-number">1</span><p><strong>总部端</strong>创建任务、配置模板，查看区域数据与风险趋势。</p></div>
+                <div class="insight-item"><span class="insight-number">1</span><p><strong>区域经理端</strong>创建任务、配置模板，查看区域数据与风险趋势。</p></div>
                 <div class="insight-item"><span class="insight-number">2</span><p><strong>督导端</strong>按计划到店，逐项评分，不符合项自动生成整改单。</p></div>
-                <div class="insight-item"><span class="insight-number">3</span><p><strong>门店端</strong>按所属门店接收任务，不区分店长和导购，完成后提交上级审核。</p></div>
+                <div class="insight-item"><span class="insight-number">3</span><p><strong>门店小伙伴</strong>按所属门店接收任务，不区分门店岗位，完成后提交上级审核。</p></div>
               </div>
             </div>
             <div class="modal-footer"><button class="button button-primary" data-action="close-modal">知道了</button></div>
@@ -7165,7 +7468,13 @@
       return;
     }
     if (event.target.matches("[data-role-select]")) {
+      if (currentAccount()?.role !== "区域经理") {
+        showToast("当前角色无权切换工作台", "error");
+        renderApp();
+        return;
+      }
       state.role = event.target.value;
+      state.rolePreview = state.role !== "hq";
       if (state.role === "store") {
         ui.mobileTab = "home";
       } else {
@@ -7186,6 +7495,10 @@
   });
 
   document.addEventListener("input", (event) => {
+    if (event.target.id === "cameraZoom") {
+      applyCameraZoom(event.target.value);
+      return;
+    }
     if (event.target.id === "taskSearch") {
       ui.taskQuery = event.target.value;
       refreshTaskResults();
@@ -7275,6 +7588,45 @@
   });
 
   document.addEventListener("submit", (event) => {
+    if (event.target.id === "loginForm") {
+      event.preventDefault();
+      const data = new FormData(event.target);
+      const loginId = String(data.get("loginId") || "").trim().toLowerCase();
+      const pin = String(data.get("pin") || "").trim();
+      const account = state.accounts.find(
+        (item) =>
+          String(item.loginId || "").toLowerCase() === loginId &&
+          String(item.pin || "") === pin,
+      );
+      if (!account) {
+        showToast("账号或密码不正确", "error");
+        return;
+      }
+      if (account.status !== "启用") {
+        showToast("该账号尚未启用，请联系区域经理", "error");
+        return;
+      }
+      state.currentAccountId = account.id;
+      state.authenticated = true;
+      applyAccountAccess(account);
+      if (launchPage) {
+        if (state.role === "store" && launchPage === "tasks") {
+          ui.mobileTab = "tasks";
+        } else if (state.role === "store" && launchPage === "issues") {
+          ui.mobileTab = "issues";
+        } else if (
+          ["overview", "tasks", "issues", "stores", "reports"].includes(
+            launchPage,
+          )
+        ) {
+          state.page = launchPage;
+        }
+      }
+      saveState();
+      renderApp();
+      showToast(`已登录：${account.name} · ${account.role}`);
+      return;
+    }
     if (event.target.id === "newStoreForm") {
       event.preventDefault();
       const data = new FormData(event.target);
@@ -7285,7 +7637,7 @@
         short: name.slice(-3, -1) || name.slice(-1),
         city: data.get("city"),
         address: data.get("address"),
-        manager: "门店人员",
+        manager: "门店小伙伴",
         managerInitials: "门",
         inspector: data.get("inspector") || "黄庆",
         score: null,
@@ -7300,7 +7652,7 @@
         momChange: 0,
         status: data.get("status"),
         businessHours: data.get("businessHours"),
-        contact: data.get("contact") || "门店人员",
+        contact: data.get("contact") || "门店小伙伴",
         phone: data.get("phone") || "",
       });
       saveState();
@@ -7336,10 +7688,10 @@
       renderApp();
       notifyDevice(
         "任务已提交",
-        `${task.title} 已提交，等待总经理审核`,
+        `${task.title} 已提交，等待区域经理审核`,
         `task-submit:${task.id}`,
       );
-      showToast("任务已提交，等待总经理审核");
+      showToast("任务已提交，等待区域经理审核");
       return;
     }
     if (event.target.id === "storeSettingForm") {
@@ -7364,18 +7716,35 @@
       const data = new FormData(event.target);
       const role = data.get("role");
       const selectedStore = storeById(data.get("storeId"));
+      const loginId = String(data.get("loginId") || "").trim().toLowerCase();
+      const pin = String(data.get("pin") || "").trim();
+      if (!loginId || pin.length < 6) {
+        showToast("登录账号不能为空，密码至少 6 位", "error");
+        return;
+      }
+      if (
+        state.accounts.some(
+          (account) =>
+            String(account.loginId || "").toLowerCase() === loginId,
+        )
+      ) {
+        showToast("该登录账号已被使用", "error");
+        return;
+      }
       state.accounts.unshift({
         id: `ACC-${Date.now()}`,
         name: String(data.get("name")).trim(),
         phone: String(data.get("phone")).trim(),
         role,
+        loginId,
+        pin,
         store:
-          role === "门店人员"
+          role === "门店小伙伴"
             ? selectedStore?.name || "未绑定门店"
             : role === "督导"
               ? "商丘区域"
               : "全区域",
-        storeId: role === "门店人员" ? selectedStore?.id || "" : "",
+        storeId: role === "门店小伙伴" ? selectedStore?.id || "" : "",
         status: data.get("status"),
       });
       saveState();
@@ -7407,9 +7776,9 @@
         dueLabel: `${Number(month)}月 ${Number(day)}日`,
         inspector:
           assigneeRole === "store"
-            ? "门店人员"
+            ? "门店小伙伴"
             : data.get("supervisor") || "黄庆",
-        createdBy: "总经理",
+        createdBy: "区域经理",
         description: data.get("description"),
         instructionPhotos: [...ui.assignTaskPhotos],
       });
@@ -7517,7 +7886,7 @@
       saveState();
       closeModal();
       navigate("issues");
-      showToast("整改问题已创建并指派对应门店人员");
+      showToast("整改问题已创建并指派对应门店小伙伴");
     }
   });
 
