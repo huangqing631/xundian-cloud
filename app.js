@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.12";
+  const APP_VERSION = "2026.11.25.13";
 
   const iconPaths = {
     home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
@@ -2373,6 +2373,9 @@
             ${icon("bell")}
             <span class="notification-dot"></span>
           </button>
+          <a class="icon-button" href="./xundian-cloud.apk" download aria-label="下载 Android App" title="下载 Android App">
+            ${icon("download")}
+          </a>
           ${renderAvatar("黄庆", "avatar-green")}
         </div>
       </header>
@@ -3695,6 +3698,7 @@
               <button class="insight-item" data-action="navigate" data-page="store-settings"><span class="insight-number">1</span><p><strong>门店设置</strong><br>营业时间、状态与门店资料</p></button>
               <button class="insight-item" data-action="navigate" data-page="accounts"><span class="insight-number">2</span><p><strong>人员账号设置</strong><br>总部、督导、门店人员与门店绑定</p></button>
               <button class="insight-item" data-action="check-update"><span class="insight-number">3</span><p><strong>应用更新中心</strong><br>检测新版本并让在线用户自动刷新</p></button>
+              <a class="insight-item" href="./xundian-cloud.apk" download><span class="insight-number">4</span><p><strong>Android 安装包</strong><br>下载 APK 安装到 Android 手机</p></a>
             </div>
           </section>
         </div>
