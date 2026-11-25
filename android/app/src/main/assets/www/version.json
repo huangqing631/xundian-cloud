@@ -1,10 +1,12 @@
 {
-  "version": "2026.11.25.22",
-  "nativeVersion": "1.0.8",
+  "version": "2026.11.25.23",
+  "nativeVersion": "1.0.9",
   "downloadUrl": "https://huangqing631.github.io/xundian-cloud/xundian-cloud-native.apk",
   "releasedAt": "2026-11-25T20:05:00+08:00",
   "title": "云端多人协作与消息推送",
   "notes": [
+    "下发任务新增区域全部，选择后自动为所有门店生成任务",
+    "下发表单移除执行督导与检查标准，巡检任务默认使用日常运营模板",
     "巡店检查标准新增日常运营模板",
     "区域经理可编辑人员姓名、手机号、登录账号、角色、所属门店和状态",
     "Android 改用固定正式签名证书，后续版本可覆盖升级",

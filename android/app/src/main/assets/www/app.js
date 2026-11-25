@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.22";
+  const APP_VERSION = "2026.11.25.23";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -6148,9 +6148,6 @@
 
   function openAssignTaskModal() {
     ui.assignTaskPhotos = [];
-    const supervisors = state.accounts.filter(
-      (account) => account.role === "督导" && account.status === "启用",
-    );
     document.getElementById("modal-root").innerHTML = `
       <div class="modal-backdrop">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="assignTaskTitle">
@@ -6162,29 +6159,13 @@
             <div class="modal-body">
               <div class="form-grid">
                 <div class="form-field full"><label>任务类型</label><select class="form-control" id="assignmentType" name="taskType"><option value="inspection">巡店任务 · 督导执行</option><option value="other">其他任务 · 督导执行</option><option value="operation">正常运营任务 · 门店执行</option></select></div>
-                <div class="form-field"><label>执行督导</label><select class="form-control" name="supervisor">${supervisors
-                  .map(
-                    (account) =>
-                      `<option value="${escapeHtml(account.name)}">${escapeHtml(
-                        account.name,
-                      )}</option>`,
-                  )
-                  .join("")}<option value="黄庆">黄庆</option></select></div>
-                <div class="form-field"><label>任务门店</label><select class="form-control" name="storeId" required>${state.stores
+                <div class="form-field"><label>任务门店</label><select class="form-control" name="storeId" required><option value="__all__">区域全部（所有门店）</option>${state.stores
                   .map(
                     (store) =>
                       `<option value="${store.id}">${escapeHtml(store.name)}</option>`,
                   )
                   .join("")}</select></div>
                 <div class="form-field full"><label>任务标题</label><input class="form-control" name="title" required placeholder="例如：复查消防通道整改情况" /></div>
-                <div class="form-field"><label>检查标准（巡店任务）</label><select class="form-control" name="templateId">${state.templates
-                  .map(
-                    (template) =>
-                      `<option value="${template.id}">${escapeHtml(
-                        template.name,
-                      )}</option>`,
-                  )
-                  .join("")}</select></div>
                 <div class="form-field"><label>完成期限</label><input class="form-control" type="date" name="due" value="2026-11-28" required /></div>
                 <div class="form-field full"><label>任务说明</label><textarea class="form-control" name="description" placeholder="说明任务背景、完成要求和审核标准"></textarea></div>
                 <div class="form-field full">
@@ -8545,13 +8526,29 @@
       const taskType = data.get("taskType");
       const assigneeRole =
         taskType === "operation" ? "store" : "supervisor";
-      const selectedStore = storeById(data.get("storeId"));
+      const selectedStoreId = String(data.get("storeId") || "");
+      const selectedStore = storeById(selectedStoreId);
+      const targetStores =
+        selectedStoreId === "__all__"
+          ? [...state.stores]
+          : selectedStore
+            ? [selectedStore]
+            : [];
+      if (!targetStores.length) {
+        showToast("请选择任务门店", "error");
+        return;
+      }
       const [year, month, day] = String(data.get("due")).split("-");
-      state.tasks.unshift({
-        id: `task-assigned-${Date.now()}`,
-        storeId: data.get("storeId"),
-        title: String(data.get("title")).trim(),
-        templateId: taskType === "inspection" ? data.get("templateId") : null,
+      const now = Date.now();
+      const batchId = `batch-${now}`;
+      const title = String(data.get("title")).trim();
+      const creator = currentAccount()?.name || "区域经理";
+      const tasks = targetStores.map((store, index) => ({
+        id: `task-assigned-${now}-${index + 1}`,
+        batchId,
+        storeId: store.id,
+        title,
+        templateId: taskType === "inspection" ? "tpl-daily" : null,
         taskType,
         assigneeRole,
         status: "pending",
@@ -8561,30 +8558,26 @@
         month: `${Number(month)}月`,
         dueLabel: `${Number(month)}月 ${Number(day)}日`,
         inspector:
-          assigneeRole === "store"
-            ? "门店小伙伴"
-            : data.get("supervisor") || "黄庆",
-        createdBy: "区域经理",
+          assigneeRole === "store" ? "门店小伙伴" : creator,
+        createdBy: creator,
+        createdByAccountId: currentAccount()?.id || "",
         description: data.get("description"),
         instructionPhotos: [...ui.assignTaskPhotos],
-      });
+      }));
+      state.tasks.unshift(...tasks);
       saveState();
       closeModal();
       renderApp();
+      const targetLabel =
+        selectedStoreId === "__all__"
+          ? `全部门店（${targetStores.length} 家）`
+          : targetStores[0].name;
       notifyDevice(
         "收到新的任务",
-        `${data.get("title")} · ${
-          assigneeRole === "store"
-            ? selectedStore?.name || "门店"
-            : data.get("supervisor") || "督导"
-        }`,
-        `assignment:${Date.now()}`,
+        `${title} · ${targetLabel}`,
+        `assignment:${batchId}`,
       );
-      showToast(
-        `任务已下发至${
-          assigneeRole === "store" ? selectedStore?.name : data.get("supervisor")
-        }`,
-      );
+      showToast(`任务已下发至${targetLabel}`);
       return;
     }
     if (event.target.id === "startVisitForm") {
