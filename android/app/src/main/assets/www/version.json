@@ -1,10 +1,13 @@
 {
-  "version": "2026.11.25.28",
-  "nativeVersion": "1.0.14",
+  "version": "2026.11.25.29",
+  "nativeVersion": "1.0.15",
   "downloadUrl": "https://huangqing631.github.io/xundian-cloud/xundian-cloud-native.apk",
   "releasedAt": "2026-11-25T20:05:00+08:00",
   "title": "云端多人协作与消息推送",
   "notes": [
+    "学习规划包含新导购入职、运营、销售技巧和产品知识",
+    "修复学习页底部被手机导航栏遮挡",
+    "手机快捷入口保持待整改、日常任务、学习三个独立入口",
     "门店首页异常报备替换为学习中心",
     "学习中心支持课程内容学习、进度记录和在线考试",
     "区域经理可在任务中心二次确认后删除任务",
