@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.13";
+  const APP_VERSION = "2026.11.25.14";
 
   const iconPaths = {
     home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
@@ -1462,6 +1462,24 @@
     mobileTab: "home",
     reportPeriod: "month",
   };
+
+  const launchParams = new URLSearchParams(window.location.search);
+  const launchPage = launchParams.get("page");
+  if (launchPage) {
+    if (state.role === "store") {
+      if (launchPage === "issues") ui.mobileTab = "issues";
+      else if (launchPage === "tasks") ui.mobileTab = "tasks";
+    } else if (
+      ["overview", "tasks", "issues", "stores", "reports"].includes(
+        launchPage,
+      )
+    ) {
+      state.page =
+        state.role === "supervisor" && launchPage === "tasks"
+          ? "tasks"
+          : launchPage;
+    }
+  }
 
   function saveState() {
     try {
@@ -4655,6 +4673,7 @@
     const root = document.getElementById("app");
     root.innerHTML =
       state.role === "store" ? renderStorePortal() : renderDesktopPage();
+    root.setAttribute("aria-busy", "false");
   }
 
   let updateCheckInFlight = false;
@@ -7282,10 +7301,20 @@
     }
   });
 
-  window.addEventListener("online", () => showToast("网络已恢复，数据将自动同步"));
-  window.addEventListener("offline", () =>
-    showToast("当前处于离线状态，操作会保存在本机", "error"),
-  );
+  function updateNetworkState() {
+    const badge = document.getElementById("network-badge");
+    if (badge) badge.hidden = navigator.onLine;
+    document.body.classList.toggle("is-offline", !navigator.onLine);
+  }
+  window.addEventListener("online", () => {
+    updateNetworkState();
+    showToast("网络已恢复，可获取最新版本与内容");
+  });
+  window.addEventListener("offline", () => {
+    updateNetworkState();
+    showToast("当前处于离线状态，操作会保存在本机", "error");
+  });
+  updateNetworkState();
 
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener("load", () => {
