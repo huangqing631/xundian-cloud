@@ -1,10 +1,12 @@
 {
-  "version": "2026.11.25.30",
-  "nativeVersion": "1.0.16",
+  "version": "2026.11.25.31",
+  "nativeVersion": "1.0.17",
   "downloadUrl": "https://huangqing631.github.io/xundian-cloud/xundian-cloud-native.apk",
   "releasedAt": "2026-11-25T20:05:00+08:00",
   "title": "云端多人协作与消息推送",
   "notes": [
+    "历史通知不再在每次进入应用时重复弹出",
+    "同一通知只显示一次，前台轮询和后台同步使用相同通知标识",
     "删除或清空的任务不再被客户端自动补回",
     "学习规划包含新导购入职、运营、销售技巧和产品知识",
     "修复学习页底部被手机导航栏遮挡",

@@ -209,11 +209,19 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void setCloudSession(String apiBase, String token) {
             if (apiBase == null || token == null || apiBase.isEmpty()) return;
-            getSharedPreferences("xundian_cloud", MODE_PRIVATE)
+            android.content.SharedPreferences prefs =
+                getSharedPreferences("xundian_cloud", MODE_PRIVATE);
+            android.content.SharedPreferences.Editor editor = prefs
                 .edit()
                 .putString("apiBase", apiBase)
-                .putString("token", token)
-                .apply();
+                .putString("token", token);
+            if (!prefs.contains("lastNotificationAt")) {
+                editor.putLong(
+                    "lastNotificationAt",
+                    System.currentTimeMillis()
+                );
+            }
+            editor.apply();
             CloudSyncWorker.configure(MainActivity.this);
         }
 

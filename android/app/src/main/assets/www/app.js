@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.30";
+  const APP_VERSION = "2026.11.25.31";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -5767,12 +5767,15 @@
       return;
     }
     try {
+      const storedCursor = localStorage.getItem(
+        CLOUD_NOTIFICATION_CURSOR_KEY,
+      );
       const [remote, notifications] = await Promise.all([
         cloudRequest("/workspace"),
         cloudRequest(
-          `/notifications?since=${Number(
-            localStorage.getItem(CLOUD_NOTIFICATION_CURSOR_KEY) || 0,
-          )}`,
+          storedCursor
+            ? `/notifications?since=${Number(storedCursor)}`
+            : "/notifications?bootstrap=1",
         ),
       ]);
       if (Number(remote.revision) > cloudRevision) {
@@ -5781,15 +5784,29 @@
         applyCloudWorkspace(remote.state, currentCloudUser(), true);
         showToast("已同步其他设备的云端更新");
       }
+      const deliveredIds = new Set(
+        JSON.parse(
+          localStorage.getItem("xundian-delivered-notification-ids") ||
+            "[]",
+        ),
+      );
       for (const notification of notifications.items || []) {
+        if (deliveredIds.has(notification.id)) continue;
         notifyDevice(
           notification.title,
           notification.body,
           `cloud-${notification.id}`,
         );
+        deliveredIds.add(notification.id);
+      }
+      localStorage.setItem(
+        "xundian-delivered-notification-ids",
+        JSON.stringify([...deliveredIds].slice(-200)),
+      );
+      if (notifications.cursor) {
         localStorage.setItem(
           CLOUD_NOTIFICATION_CURSOR_KEY,
-          String(notification.createdAt),
+          String(notifications.cursor),
         );
       }
     } catch (error) {

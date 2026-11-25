@@ -120,7 +120,9 @@ public class CloudSyncWorker extends Worker {
                         "body",
                         "您有新的巡店消息"
                     );
-                    String id = item.optString("id", "cloud-" + index);
+                    String id =
+                        "cloud-" +
+                        item.optString("id", "message-" + index);
                     long createdAt = item.optLong("createdAt", 0);
                     NotificationHelper.show(context, title, body, id);
                     cursor = Math.max(cursor, createdAt);
