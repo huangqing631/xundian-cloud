@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.Settings;
 import android.view.ViewGroup;
 import android.webkit.PermissionRequest;
@@ -21,7 +22,17 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import androidx.core.content.FileProvider;
 import androidx.webkit.WebViewAssetLoader;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import me.leolin.shortcutbadger.ShortcutBadger;
 
 public class MainActivity extends Activity {
@@ -39,6 +50,10 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> pendingFileCallback;
     private PermissionRequest pendingCameraRequest;
     private long lastRootBackAt = 0;
+    private final ExecutorService updateExecutor = Executors.newSingleThreadExecutor();
+    private volatile boolean updateDownloadInFlight = false;
+    private String pendingUpdateUrl = "";
+    private String pendingUpdateVersion = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -267,6 +282,23 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void downloadAndInstallUpdate(String url, String version) {
+            if (!isTrustedUpdateUrl(url)) {
+                runOnUiThread(
+                    () -> Toast.makeText(
+                        MainActivity.this,
+                        "更新地址校验失败，请联系管理员",
+                        Toast.LENGTH_LONG
+                    ).show()
+                );
+                return;
+            }
+            pendingUpdateUrl = url;
+            pendingUpdateVersion = version == null ? "" : version;
+            runOnUiThread(() -> beginNativeUpdateDownload());
+        }
+
+        @JavascriptInterface
         public void scheduleReminder(
             double timestamp,
             String title,
@@ -313,6 +345,152 @@ public class MainActivity extends Activity {
             new String[] { Manifest.permission.CAMERA },
             CAMERA_PERMISSION_REQUEST
         );
+    }
+
+    private boolean isTrustedUpdateUrl(String value) {
+        if (value == null || value.isEmpty()) return false;
+        Uri uri = Uri.parse(value);
+        if (!"https".equals(uri.getScheme())) return false;
+        String host = uri.getHost();
+        return CLOUD_APP_HOST.equals(host)
+            || "huangqing631.github.io".equals(host);
+    }
+
+    private void beginNativeUpdateDownload() {
+        if (pendingUpdateUrl.isEmpty() || updateDownloadInFlight) return;
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && !getPackageManager().canRequestPackageInstalls()
+        ) {
+            Toast.makeText(
+                this,
+                "请允许巡店云安装更新，返回后会自动继续下载",
+                Toast.LENGTH_LONG
+            ).show();
+            try {
+                Intent settingsIntent = new Intent(
+                    Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                    Uri.parse("package:" + getPackageName())
+                );
+                startActivity(settingsIntent);
+            } catch (Exception ignored) {
+                Toast.makeText(
+                    this,
+                    "请到系统设置中允许安装未知来源应用",
+                    Toast.LENGTH_LONG
+                ).show();
+            }
+            return;
+        }
+        downloadUpdatePackage(pendingUpdateUrl, pendingUpdateVersion);
+    }
+
+    private void downloadUpdatePackage(String urlValue, String version) {
+        updateDownloadInFlight = true;
+        Toast.makeText(
+            this,
+            "正在后台下载最新版本，完成后会弹出安装确认",
+            Toast.LENGTH_LONG
+        ).show();
+        updateExecutor.execute(() -> {
+            File partialFile = null;
+            try {
+                File downloadRoot = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+                if (downloadRoot == null) downloadRoot = getCacheDir();
+                if (!downloadRoot.exists() && !downloadRoot.mkdirs()) {
+                    throw new IllegalStateException("无法创建更新目录");
+                }
+                String safeVersion = version.replaceAll("[^0-9A-Za-z._-]", "");
+                String fileName = "xundian-cloud-"
+                    + (safeVersion.isEmpty() ? String.valueOf(System.currentTimeMillis()) : safeVersion)
+                    + ".apk";
+                File targetFile = new File(downloadRoot, fileName);
+                partialFile = new File(downloadRoot, fileName + ".part");
+                if (partialFile.exists() && !partialFile.delete()) {
+                    throw new IllegalStateException("无法清理旧下载文件");
+                }
+
+                HttpURLConnection connection =
+                    (HttpURLConnection) new URL(urlValue).openConnection();
+                connection.setConnectTimeout(20000);
+                connection.setReadTimeout(120000);
+                connection.setInstanceFollowRedirects(true);
+                connection.setRequestProperty("Cache-Control", "no-cache");
+                connection.connect();
+                int statusCode = connection.getResponseCode();
+                if (statusCode < 200 || statusCode >= 300) {
+                    throw new IllegalStateException("更新下载失败 (" + statusCode + ")");
+                }
+                InputStream input = connection.getInputStream();
+                FileOutputStream output = new FileOutputStream(partialFile);
+                try {
+                    byte[] buffer = new byte[64 * 1024];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, count);
+                    }
+                    output.flush();
+                } finally {
+                    output.close();
+                    input.close();
+                    connection.disconnect();
+                }
+                if (partialFile.length() < 1024) {
+                    throw new IllegalStateException("下载的安装包不完整");
+                }
+                if (targetFile.exists() && !targetFile.delete()) {
+                    throw new IllegalStateException("无法替换旧安装包");
+                }
+                if (!partialFile.renameTo(targetFile)) {
+                    throw new IllegalStateException("无法保存安装包");
+                }
+                partialFile = null;
+                File completedFile = targetFile;
+                runOnUiThread(() -> launchPackageInstaller(completedFile));
+            } catch (Exception error) {
+                if (partialFile != null && partialFile.exists()) {
+                    partialFile.delete();
+                }
+                String message = error.getMessage();
+                runOnUiThread(
+                    () -> Toast.makeText(
+                        MainActivity.this,
+                        message == null || message.isEmpty()
+                            ? "更新下载失败，请稍后重试"
+                            : message,
+                        Toast.LENGTH_LONG
+                    ).show()
+                );
+            } finally {
+                updateDownloadInFlight = false;
+            }
+        });
+    }
+
+    private void launchPackageInstaller(File packageFile) {
+        try {
+            Uri packageUri = FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                packageFile
+            );
+            Intent installIntent = new Intent(Intent.ACTION_VIEW)
+                .setDataAndType(
+                    packageUri,
+                    "application/vnd.android.package-archive"
+                )
+                .addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_ACTIVITY_NEW_TASK
+                );
+            startActivity(installIntent);
+        } catch (Exception error) {
+            Toast.makeText(
+                this,
+                "无法打开系统安装程序，请稍后重试",
+                Toast.LENGTH_LONG
+            ).show();
+        }
     }
 
     @Override
@@ -377,6 +555,21 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (
+            !pendingUpdateUrl.isEmpty()
+                && !updateDownloadInFlight
+                && (
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.O
+                        || getPackageManager().canRequestPackageInstalls()
+                )
+        ) {
+            runOnUiThread(this::beginNativeUpdateDownload);
+        }
+    }
+
+    @Override
     public void onBackPressed() {
         if (webView == null) {
             super.onBackPressed();
@@ -414,6 +607,7 @@ public class MainActivity extends Activity {
             webView.stopLoading();
             webView.destroy();
         }
+        updateExecutor.shutdownNow();
         super.onDestroy();
     }
 }

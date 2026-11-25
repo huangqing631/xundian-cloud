@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.33";
+  const APP_VERSION = "2026.11.26.35";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -1840,30 +1840,53 @@
 
   const launchParams = new URLSearchParams(window.location.search);
   const launchPage = launchParams.get("page");
+  const appPlatform =
+    launchParams.get("platform") ||
+    (window.XundianNative?.isNativeApp?.() ? "android" : "web");
   const nativeBridge = window.XundianNative || null;
   const isNativeApp =
     launchParams.get("native") === "1" ||
     Boolean(nativeBridge?.isNativeApp?.());
   const NATIVE_APP_VERSION = nativeBridge?.getAppVersion?.() || "";
   const RELEASE_FEED_URL = isNativeApp
-    ? "https://huangqing631.github.io/xundian-cloud/version.json"
+    ? "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/web/version.json"
     : "./version.json";
   if (isNativeApp) {
     document.documentElement.classList.add("native-app");
   }
-  if (launchPage) {
-    if (state.role === "store") {
-      if (launchPage === "issues") ui.mobileTab = "issues";
-      else if (launchPage === "tasks") ui.mobileTab = "tasks";
-    } else if (
-      ["overview", "tasks", "issues", "stores", "reports"].includes(
-        launchPage,
-      )
+  let launchTargetPending = Boolean(launchPage);
+
+  function applyLaunchTarget() {
+    if (
+      !launchTargetPending ||
+      !state.authenticated ||
+      !currentAccount()
     ) {
-      state.page =
-        state.role === "supervisor" && launchPage === "tasks"
-          ? "tasks"
-          : launchPage;
+      return;
+    }
+    const page = String(launchPage || "");
+    const allowedPages = [
+      "overview",
+      "tasks",
+      "issues",
+      "learning",
+      "stores",
+      "reports",
+    ];
+    if (!allowedPages.includes(page)) {
+      launchTargetPending = false;
+      return;
+    }
+    if (state.role === "store") {
+      ui.mobileTab =
+        page === "tasks" || page === "issues" || page === "learning"
+          ? page
+          : "home";
+    } else {
+      state.page = page;
+    }
+    if (cloudReady || !CLOUD_API_BASE || !cloudToken()) {
+      launchTargetPending = false;
     }
   }
 
@@ -4487,6 +4510,18 @@
         task.status === "submitted" ||
         task.reviewStatus === "pending_review",
     );
+    const currentVersion =
+      appPlatform === "android"
+        ? `Android ${NATIVE_APP_VERSION || APP_VERSION}`
+        : appPlatform === "harmony"
+          ? "鸿蒙 App"
+          : `网页 ${APP_VERSION}`;
+    const updateDescription =
+      appPlatform === "android"
+        ? "每分钟自动检查；发现新包后自动下载，并弹出系统安装确认"
+        : appPlatform === "harmony"
+          ? "启动和切回应用时自动检查应用市场更新"
+          : "每分钟自动检查，新版本发布后自动刷新当前页面";
     return `
       <section>
         <div class="page-header">
@@ -4501,7 +4536,7 @@
           <article class="summary-card"><span class="summary-icon" style="--accent:var(--purple);--tint:var(--purple-soft)">${icon("check-circle")}</span><span class="summary-copy"><strong>${reviewTasks.length}</strong><span>待审核任务</span></span></article>
           <article class="summary-card"><span class="summary-icon" style="--accent:var(--blue);--tint:var(--blue-soft)">${icon("list-checks")}</span><span class="summary-copy"><strong>${state.tasks.length}</strong><span>任务总数</span></span></article>
           <article class="summary-card"><span class="summary-icon" style="--accent:var(--green);--tint:var(--green-soft)">${icon("user")}</span><span class="summary-copy"><strong>${state.accounts.length}</strong><span>人员账号</span></span></article>
-          <article class="summary-card"><span class="summary-icon" style="--accent:var(--orange);--tint:var(--orange-soft)">${icon("refresh")}</span><span class="summary-copy"><strong>${APP_VERSION}</strong><span>当前应用版本</span></span></article>
+          <article class="summary-card"><span class="summary-icon" style="--accent:var(--orange);--tint:var(--orange-soft)">${icon("refresh")}</span><span class="summary-copy"><strong style="font-size:16px">${escapeHtml(currentVersion)}</strong><span>当前客户端</span></span></article>
         </div>
         <div class="report-summary">
           <section class="panel ranking-panel">
@@ -4536,13 +4571,17 @@
           </section>
           <section class="panel insight-card">
             <div class="panel-header" style="padding:0">
-              <div class="panel-heading"><h3>管理入口</h3><p>常用配置与系统能力</p></div>
+              <div class="panel-heading"><h3>管理入口</h3><p>账号、系统与门店配置已按使用频率重新分组</p></div>
             </div>
             <div class="insight-list">
-              <button class="insight-item" data-action="navigate" data-page="store-settings"><span class="insight-number">1</span><p><strong>门店设置</strong><br>营业时间、状态与门店资料</p></button>
-              <button class="insight-item" data-action="navigate" data-page="accounts"><span class="insight-number">2</span><p><strong>人员账号设置</strong><br>区域经理、督导、门店小伙伴与门店绑定</p></button>
-              <button class="insight-item" data-action="check-update"><span class="insight-number">3</span><p><strong>应用更新中心</strong><br>检测新版本并让在线用户自动刷新</p></button>
-              ${isNativeApp ? `<button class="insight-item" data-action="native-update"><span class="insight-number">4</span><p><strong>下载原生版更新</strong><br>发现新版本后会发系统通知，也可在这里主动下载</p></button>` : `<a class="insight-item" href="./xundian-cloud-native.apk" download><span class="insight-number">4</span><p><strong>Android 原生安装包</strong><br>本地内置应用资源，不再依赖 Chrome 或跳出浏览器</p></a>`}
+              <div style="padding:4px 2px 6px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em">账号与权限</div>
+              <button class="insight-item" data-action="navigate" data-page="accounts"><span class="insight-number">${icon("user", "icon-sm")}</span><p><strong>人员账号设置</strong><br>新增、编辑、删除账号并维护门店绑定</p></button>
+              <button class="insight-item" data-action="navigate" data-page="approvals"><span class="insight-number">${icon("check-circle", "icon-sm")}</span><p><strong>注册审批</strong><br>审核申请人并分配角色、门店和登录权限</p></button>
+              <div style="padding:12px 2px 6px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em">应用与系统</div>
+              <button class="insight-item" data-action="check-update"><span class="insight-number">${icon("refresh", "icon-sm")}</span><p><strong>版本与自动更新</strong><br>${escapeHtml(updateDescription)}</p></button>
+              ${isNativeApp ? `<button class="insight-item" data-action="native-update"><span class="insight-number">${icon("download", "icon-sm")}</span><p><strong>立即安装最新版</strong><br>检查更新并开始下载；安装前由系统确认</p></button>` : `<a class="insight-item" href="./xundian-cloud-native.apk" download><span class="insight-number">${icon("download", "icon-sm")}</span><p><strong>Android 安装包</strong><br>网页、Android、鸿蒙和小程序版本共用同一套业务能力</p></a>`}
+              <div style="padding:12px 2px 6px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em">门店管理</div>
+              <button class="insight-item" data-action="navigate" data-page="store-settings"><span class="insight-number">${icon("store", "icon-sm")}</span><p><strong>门店设置</strong><br>新增、编辑、删除门店及维护营业资料</p></button>
             </div>
           </section>
         </div>
@@ -6028,6 +6067,10 @@
       state.role = "hq";
       state.rolePreview = false;
     }
+    applyLaunchTarget();
+    if (state.page === "learning" || ui.mobileTab === "learning") {
+      window.setTimeout(() => loadLearningProgress(false), 0);
+    }
     root.innerHTML =
       state.role === "store" ? renderStorePortal() : renderDesktopPage();
     root.setAttribute("aria-busy", "false");
@@ -6035,6 +6078,51 @@
   }
 
   let updateCheckInFlight = false;
+  function isNewerVersion(candidate, current) {
+    const normalize = (value) =>
+      String(value || "")
+        .split(/[.+-]/)
+        .map((part) => Number.parseInt(part, 10))
+        .filter((part) => Number.isFinite(part));
+    const next = normalize(candidate);
+    const installed = normalize(current);
+    if (!next.length || !installed.length) return false;
+    const length = Math.max(next.length, installed.length);
+    for (let index = 0; index < length; index += 1) {
+      const difference = (next[index] || 0) - (installed[index] || 0);
+      if (difference !== 0) return difference > 0;
+    }
+    return false;
+  }
+
+  function startNativeUpdate(release, automatic = false) {
+    const downloadUrl =
+      release.downloadUrl ||
+      "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/web/xundian-cloud-native.apk";
+    if (nativeBridge?.downloadAndInstallUpdate) {
+      if (automatic) {
+        localStorage.setItem(
+          "xundian-native-auto-install-version",
+          release.nativeVersion,
+        );
+      }
+      nativeBridge.downloadAndInstallUpdate(
+        downloadUrl,
+        release.nativeVersion || "",
+      );
+      showToast(
+        automatic
+          ? `正在后台下载 ${release.nativeVersion || "新版本"}，完成后会弹出安装确认`
+          : "正在下载最新版，完成后会弹出安装确认",
+      );
+      return;
+    }
+    showToast("正在打开安装包下载地址");
+    window.setTimeout(() => {
+      window.location.href = downloadUrl;
+    }, 180);
+  }
+
   async function checkForAppUpdate(manual = false) {
     if (updateCheckInFlight) return;
     updateCheckInFlight = true;
@@ -6043,10 +6131,20 @@
         cache: "no-store",
       });
       const release = await response.json();
+      if (isNativeApp && appPlatform === "harmony") {
+        if (manual) {
+          showToast(
+            release.harmonyVersion
+              ? `鸿蒙版 ${release.harmonyVersion} 将通过应用市场自动提醒更新`
+              : "当前为鸿蒙客户端，应用市场会自动检查更新",
+          );
+        }
+        return;
+      }
       if (
         isNativeApp &&
         release.nativeVersion &&
-        release.nativeVersion !== NATIVE_APP_VERSION
+        isNewerVersion(release.nativeVersion, NATIVE_APP_VERSION)
       ) {
         localStorage.setItem(
           "xundian-last-native-release",
@@ -6058,7 +6156,7 @@
         if (notifiedVersion !== release.nativeVersion) {
           notifyDevice(
             "巡店云有新版本",
-            `原生版 ${release.nativeVersion} 已发布，请到管理中心下载更新。`,
+            `Android ${release.nativeVersion} 已发布，将自动下载并在完成后提示安装。`,
             `app-update-${release.nativeVersion}`,
           );
           localStorage.setItem(
@@ -6066,14 +6164,24 @@
             release.nativeVersion,
           );
         }
+        const autoInstallVersion = localStorage.getItem(
+          "xundian-native-auto-install-version",
+        );
+        if (autoInstallVersion !== release.nativeVersion) {
+          startNativeUpdate(release, true);
+        }
         if (manual) {
           showToast(
-            `发现原生版 ${release.nativeVersion}，可在管理中心下载更新`,
+            `发现 Android ${release.nativeVersion}，正在准备安装`,
           );
         }
         return;
       }
-      if (!isNativeApp && release.version && release.version !== APP_VERSION) {
+      if (
+        !isNativeApp &&
+        release.version &&
+        isNewerVersion(release.version, APP_VERSION)
+      ) {
         showToast(`发现新版本 ${release.version}，正在自动更新`);
         localStorage.setItem(
           "xundian-last-release",
@@ -6103,6 +6211,7 @@
 
   window.__xundianAppVersion = APP_VERSION;
   window.setInterval(() => checkForAppUpdate(false), 60_000);
+  window.setTimeout(() => checkForAppUpdate(false), 2_500);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") checkForAppUpdate(false);
   });
@@ -8724,20 +8833,19 @@
       return;
     }
     if (action === "native-update") {
-      let downloadUrl =
-        "https://huangqing631.github.io/xundian-cloud/xundian-cloud-native.apk";
+      let release = {
+        downloadUrl:
+          "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/web/xundian-cloud-native.apk",
+      };
       try {
-        const release = JSON.parse(
+        const cachedRelease = JSON.parse(
           localStorage.getItem("xundian-last-native-release") || "{}",
         );
-        if (release.downloadUrl) downloadUrl = release.downloadUrl;
+        if (cachedRelease.downloadUrl) release = cachedRelease;
       } catch {
         // Use the stable download address when release metadata is unavailable.
       }
-      showToast("正在打开原生版下载页面");
-      window.setTimeout(() => {
-        window.location.href = downloadUrl;
-      }, 180);
+      startNativeUpdate(release, false);
       return;
     }
     if (action === "notifications") {
