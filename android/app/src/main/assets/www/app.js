@@ -5686,6 +5686,8 @@
           pin: "",
         }));
         state.deletedAccountIds = result.state.deletedAccountIds || [];
+        state.accountsSyncGeneration =
+          result.state.accountsSyncGeneration || "";
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
     } catch (error) {
