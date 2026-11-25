@@ -54,6 +54,15 @@ body {
   font-family: var(--font);
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
 }
 
 button,
@@ -80,6 +89,68 @@ a {
 
 svg {
   display: block;
+}
+
+.boot-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 75% 18%, rgba(255, 209, 92, 0.2), transparent 28%),
+    var(--bg);
+}
+
+.boot-screen img {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(255, 90, 69, 0.22);
+}
+
+.boot-screen strong {
+  display: block;
+  font-size: 18px;
+}
+
+.boot-screen span {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-soft);
+  font-size: 10px;
+}
+
+.boot-spinner {
+  width: 18px;
+  height: 18px;
+  margin-left: 10px;
+  border: 2px solid rgba(255, 90, 69, 0.2);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: boot-spin 700ms linear infinite;
+}
+
+.network-badge {
+  position: fixed;
+  z-index: 45;
+  top: calc(78px + env(safe-area-inset-top));
+  left: 50%;
+  padding: 7px 12px;
+  color: #604400;
+  background: var(--yellow);
+  border-radius: 20px;
+  box-shadow: var(--shadow-sm);
+  font-size: 9px;
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+
+@keyframes boot-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 ::selection {
@@ -4179,8 +4250,10 @@ textarea.form-control {
   }
 
   .topbar {
-    height: 62px;
+    height: calc(62px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
     padding: 0 18px;
+    padding-top: env(safe-area-inset-top);
   }
 
   .icon-button.mobile-menu-button {
@@ -4220,7 +4293,7 @@ textarea.form-control {
     position: fixed;
     z-index: 30;
     right: 12px;
-    bottom: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
     left: 12px;
     height: 60px;
     display: grid;
@@ -4284,13 +4357,13 @@ textarea.form-control {
   }
 
   .store-mobile-header {
-    padding-top: 14px;
+    padding-top: calc(14px + env(safe-area-inset-top));
   }
 
   .store-portal-wrap .role-switcher {
     position: fixed;
     z-index: 20;
-    top: 16px;
+    top: calc(16px + env(safe-area-inset-top));
     right: 17px;
   }
 
@@ -4300,6 +4373,13 @@ textarea.form-control {
 }
 
 @media (max-width: 700px) {
+  .form-control,
+  .check-note,
+  .topbar-search input,
+  .inline-search input {
+    font-size: 16px;
+  }
+
   .topbar-search {
     display: none;
   }
@@ -4416,6 +4496,17 @@ textarea.form-control {
 
   .rating-pills {
     padding-left: 0;
+  }
+}
+
+@supports (padding: max(0px)) {
+  .mobile-tabbar {
+    height: calc(76px + env(safe-area-inset-bottom));
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  }
+
+  .store-mobile-content {
+    padding-bottom: calc(100px + env(safe-area-inset-bottom));
   }
 }
 
