@@ -1,10 +1,15 @@
 {
-  "version": "2026.11.25.17",
-  "nativeVersion": "1.0.3",
+  "version": "2026.11.25.18",
+  "nativeVersion": "1.0.4",
   "downloadUrl": "https://huangqing631.github.io/xundian-cloud/xundian-cloud-native.apk",
   "releasedAt": "2026-11-25T20:05:00+08:00",
-  "title": "角色名称、权限与相机体验更新",
+  "title": "云端多人协作与消息推送",
   "notes": [
+    "相机优先选择超广角镜头，支持镜头切换和低于 1 倍的硬件广角",
+    "Android 返回手势改为应用内返回，连续返回两次才退出",
+    "新增云端账号登录和跨设备工作区同步",
+    "新增云数据库、云文件上传和角色数据隔离",
+    "新增 Web Push 与 Android 后台通知轮询",
     "新增账号密码登录和退出登录",
     "区域经理可管理登录账号和重置密码",
     "管理层角色统一更名为区域经理",
