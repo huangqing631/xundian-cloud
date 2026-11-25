@@ -4321,6 +4321,18 @@ textarea.form-control {
   overflow: auto;
 }
 
+.store-mobile-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: max(4px, env(safe-area-inset-top)) 16px 0;
+}
+
+.store-mobile-toolbar + .store-mobile-header {
+  padding-top: 9px;
+}
+
 .store-mobile-header {
   display: flex;
   align-items: center;

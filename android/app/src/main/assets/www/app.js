@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.32";
+  const APP_VERSION = "2026.11.25.33";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -11,6 +11,7 @@
   const CLOUD_TOKEN_KEY = "xundian-cloud-token";
   const CLOUD_REVISION_KEY = "xundian-cloud-revision";
   const CLOUD_NOTIFICATION_CURSOR_KEY = "xundian-cloud-notification-cursor";
+  const UNREAD_BADGE_KEY = "xundian-unread-message-count";
   let cloudReady = false;
   let cloudRevision = Number(localStorage.getItem(CLOUD_REVISION_KEY) || 0);
   let cloudSyncTimer = null;
@@ -1881,6 +1882,33 @@
     } catch {
       // Notification support varies across browsers and WebView versions.
     }
+  }
+
+  function setLauncherBadgeCount(count) {
+    const value = Math.max(0, Number(count) || 0);
+    try {
+      localStorage.setItem(UNREAD_BADGE_KEY, String(value));
+    } catch {
+      // Badge persistence is optional.
+    }
+    try {
+      nativeBridge?.setBadgeCount?.(value);
+    } catch {
+      // Non-Android shells use the Web Badging API below.
+    }
+    try {
+      if (value > 0) navigator.setAppBadge?.(value);
+      else navigator.clearAppBadge?.();
+    } catch {
+      // Browser support varies by platform and launcher.
+    }
+  }
+
+  function unreadBadgeCount() {
+    return Math.max(
+      0,
+      Number(localStorage.getItem(UNREAD_BADGE_KEY) || 0),
+    );
   }
 
   async function enableDeviceNotifications() {
@@ -5452,16 +5480,13 @@
               : renderMobileHome();
     return `
       <div class="store-portal-wrap">
-        <div class="store-portal-role" style="position: fixed; top: 22px; right: 24px; z-index: 20">
-          <div class="store-portal-actions">
-            ${renderRoleSelect()}
-            <button class="icon-button" data-action="feedback-center" aria-label="反馈与建议" title="反馈与建议">${icon("message")}</button>
-            <button class="logout-text-button" data-action="logout">退出</button>
-          </div>
-        </div>
         <div class="phone-shell">
           <div class="phone-screen">
             <div class="store-mobile">
+              <div class="store-mobile-toolbar">
+                <button class="icon-button" data-action="feedback-center" aria-label="反馈与建议" title="反馈与建议">${icon("message")}</button>
+                <button class="logout-text-button" data-action="logout">退出</button>
+              </div>
               <header class="store-mobile-header">
                 <div class="store-mobile-brand">${icon("check-circle", "icon-sm")}</div>
                 <div class="store-mobile-heading">
@@ -5863,6 +5888,7 @@
             "[]",
         ),
       );
+      let unreadCount = unreadBadgeCount();
       for (const notification of notifications.items || []) {
         if (deliveredIds.has(notification.id)) continue;
         notifyDevice(
@@ -5871,6 +5897,7 @@
           `cloud-${notification.id}`,
         );
         deliveredIds.add(notification.id);
+        unreadCount += 1;
       }
       localStorage.setItem(
         "xundian-delivered-notification-ids",
@@ -5882,6 +5909,7 @@
           String(notifications.cursor),
         );
       }
+      setLauncherBadgeCount(unreadCount);
     } catch (error) {
       if (error.status === 401) handleCloudUnauthorized();
     }
@@ -8713,6 +8741,7 @@
       return;
     }
     if (action === "notifications") {
+      setLauncherBadgeCount(0);
       enableDeviceNotifications();
       return;
     }
@@ -9680,6 +9709,7 @@
     }
   };
 
+  setLauncherBadgeCount(unreadBadgeCount());
   renderApp();
   if (CLOUD_API_BASE && cloudToken()) {
     restoreCloudSession().catch(() => {});

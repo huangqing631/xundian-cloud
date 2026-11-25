@@ -1,10 +1,12 @@
 {
-  "version": "2026.11.25.32",
-  "nativeVersion": "1.0.18",
+  "version": "2026.11.25.33",
+  "nativeVersion": "1.0.19",
   "downloadUrl": "https://huangqing631.github.io/xundian-cloud/xundian-cloud-native.apk",
   "releasedAt": "2026-11-25T20:05:00+08:00",
   "title": "云端多人协作与消息推送",
   "notes": [
+    "支持桌面图标未读消息数字角标",
+    "修复手机端右上角工具栏与门店标题重叠",
     "任务按优先级和完成期限排序，优先级高于时间",
     "门店快捷操作显示待整改和日常任务数量",
     "门店端字体与标签整体放大",

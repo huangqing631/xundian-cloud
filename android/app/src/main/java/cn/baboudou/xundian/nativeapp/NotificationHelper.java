@@ -27,6 +27,7 @@ public final class NotificationHelper {
             );
         channel.setDescription("任务下发、整改反馈、审核结果和到期提醒");
         channel.enableVibration(true);
+        channel.setShowBadge(true);
         manager.createNotificationChannel(channel);
     }
 
@@ -35,6 +36,16 @@ public final class NotificationHelper {
         String title,
         String body,
         String notificationId
+    ) {
+        show(context, title, body, notificationId, 1);
+    }
+
+    public static void show(
+        Context context,
+        String title,
+        String body,
+        String notificationId,
+        int badgeCount
     ) {
         createChannel(context);
         Intent intent = new Intent(context, MainActivity.class);
@@ -63,6 +74,7 @@ public final class NotificationHelper {
             .setStyle(new Notification.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
+            .setNumber(Math.max(1, badgeCount))
             .setPriority(Notification.PRIORITY_HIGH)
             .setCategory(Notification.CATEGORY_REMINDER);
 

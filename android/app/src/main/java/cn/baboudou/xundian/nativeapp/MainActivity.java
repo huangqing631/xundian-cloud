@@ -22,6 +22,7 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import androidx.webkit.WebViewAssetLoader;
+import me.leolin.shortcutbadger.ShortcutBadger;
 
 public class MainActivity extends Activity {
     private static final String CLOUD_APP_HOST =
@@ -234,6 +235,20 @@ public class MainActivity extends Activity {
                 .remove("lastNotificationAt")
                 .apply();
             CloudSyncWorker.clear(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public void setBadgeCount(int count) {
+            getSharedPreferences("xundian_cloud", MODE_PRIVATE)
+                .edit()
+                .putInt("unreadBadgeCount", Math.max(0, count))
+                .apply();
+            try {
+                if (count > 0) ShortcutBadger.applyCount(MainActivity.this, count);
+                else ShortcutBadger.removeCount(MainActivity.this);
+            } catch (Exception ignored) {
+                // Some launchers do not support numeric application badges.
+            }
         }
 
         @JavascriptInterface
