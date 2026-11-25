@@ -172,6 +172,17 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public String getAppVersion() {
+            try {
+                return getPackageManager()
+                    .getPackageInfo(getPackageName(), 0)
+                    .versionName;
+            } catch (PackageManager.NameNotFoundException ignored) {
+                return "";
+            }
+        }
+
+        @JavascriptInterface
         public void requestNotifications() {
             runOnUiThread(MainActivity.this::requestNotificationPermission);
         }
