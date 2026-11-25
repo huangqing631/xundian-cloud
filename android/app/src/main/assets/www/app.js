@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.21";
+  const APP_VERSION = "2026.11.25.22";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -214,6 +214,107 @@
               id: "operation-3",
               title: "闭店检查记录完整并按要求签字",
               hint: "近 7 日记录无缺失",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "tpl-daily",
+      name: "日常运营",
+      description:
+        "用于门店日常运营快速巡检，覆盖现场卫生、商品陈列、人员服务、活动执行与安全管理。",
+      icon: "clipboard",
+      color: "blue",
+      version: "V1.0",
+      usage: 10,
+      categories: [
+        {
+          id: "daily-cleaning",
+          name: "现场卫生",
+          photoCount: 1,
+          photoHint: "门店入口、主通道与主陈列区整体环境",
+          items: [
+            {
+              id: "daily-cleaning-1",
+              title: "门头、橱窗、玻璃与入口地面保持整洁",
+              hint: "无明显灰尘、胶渍、纸屑或堆放杂物",
+              photos: 1,
+            },
+            {
+              id: "daily-cleaning-2",
+              title: "货架、商品与收银区干净无积灰",
+              hint: "随机抽检主陈列区和收银台",
+              photos: 1,
+            },
+          ],
+        },
+        {
+          id: "daily-display",
+          name: "商品陈列",
+          photoCount: 1,
+          photoHint: "主陈列区、价签及畅销商品补货情况",
+          items: [
+            {
+              id: "daily-display-1",
+              title: "主陈列整齐，价签对应且无缺失",
+              hint: "检查当前陈列指引执行情况",
+              photos: 1,
+            },
+            {
+              id: "daily-display-2",
+              title: "畅销商品货量充足，商品表面无污渍",
+              hint: "发现缺货需说明补货时间",
+              photos: 1,
+            },
+          ],
+        },
+        {
+          id: "daily-service",
+          name: "人员服务",
+          photoCount: 1,
+          photoHint: "当班人员工装、仪容与服务状态",
+          items: [
+            {
+              id: "daily-service-1",
+              title: "当班人员工装整齐、仪容符合要求",
+              hint: "按照门店服务规范检查",
+              photos: 1,
+            },
+            {
+              id: "daily-service-2",
+              title: "主动迎宾、微笑服务并完成标准接待",
+              hint: "观察顾客进店后的接待过程",
+              photos: 1,
+            },
+          ],
+        },
+        {
+          id: "daily-campaign",
+          name: "活动执行",
+          photoCount: 1,
+          photoHint: "当期活动物料、重点商品和 POP 展示",
+          items: [
+            {
+              id: "daily-campaign-1",
+              title: "当期活动物料齐全，员工能准确说明活动",
+              hint: "随机抽问至少 1 名门店小伙伴",
+              photos: 1,
+            },
+          ],
+        },
+        {
+          id: "daily-safety",
+          name: "安全管理",
+          photoCount: 1,
+          photoHint: "消防通道、灭火器和用电区域",
+          items: [
+            {
+              id: "daily-safety-1",
+              title: "消防通道畅通，灭火器有效，无私拉插排",
+              hint: "发现重大安全隐患需立即上报",
+              photos: 1,
+              severity: "high",
             },
           ],
         },
@@ -1328,6 +1429,18 @@
   }
 
   function normalizeAppState(target) {
+    target.templates = target.templates || [];
+    const existingTemplateIds = new Set(
+      target.templates.map((template) => template.id),
+    );
+    [
+      ...templatesSeedV2,
+      ...templatesSeed.filter((template) => template.id === "tpl-daily"),
+    ].forEach((template) => {
+      if (!existingTemplateIds.has(template.id)) {
+        target.templates.push(template);
+      }
+    });
     if (typeof target.rolePreview !== "boolean") {
       target.rolePreview = target.role !== "hq";
     }
@@ -1969,18 +2082,26 @@
             )
             .join("")}
         </div>
-        <div style="margin-top:9px">
-          <label class="button button-secondary button-sm photo-upload-label" for="execution-photo-${
+        <div class="execution-photo-actions" style="margin-top:9px">
+          <label class="button button-secondary button-sm photo-upload-label" for="execution-photo-upload-${
             task.id
-          }">${icon("camera", "icon-sm")} ${
-            photos.length ? "继续添加图片" : "上传完成图片"
+          }">${icon("image", "icon-sm")} ${
+            photos.length ? "继续上传相册图片" : "从相册上传"
           }</label>
-          <input class="photo-file-input" id="execution-photo-${
+          <label class="button button-secondary button-sm photo-upload-label" for="execution-photo-camera-${
+            task.id
+          }">${icon("camera", "icon-sm")} 直接拍照</label>
+          <input class="photo-file-input" id="execution-photo-upload-${
             task.id
           }" type="file" accept="image/*" multiple data-execution-photo-input data-task-id="${
             task.id
           }" />
-          <div class="form-hint">门店完成反馈支持从相册上传，最多 3 张。</div>
+          <input class="photo-file-input" id="execution-photo-camera-${
+            task.id
+          }" type="file" accept="image/*" capture="environment" data-execution-photo-input data-task-id="${
+            task.id
+          }" />
+          <div class="form-hint">可从相册上传，也可直接调用相机拍摄，最多 3 张。</div>
         </div>
       </div>
     `;
@@ -5137,6 +5258,7 @@
 
   function applyCloudWorkspace(remote, user, shouldRender = true) {
     const account = cloudAccountFromUser(user);
+    const previousTemplateCount = state.templates?.length || 0;
     const accounts = (remote.accounts || [account]).map((item) => ({
       ...item,
       cloudManaged: true,
@@ -5154,6 +5276,12 @@
     cloudReady = true;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     if (shouldRender) renderApp();
+    if (
+      account.role === "区域经理" &&
+      state.templates.length > previousTemplateCount
+    ) {
+      scheduleCloudSync();
+    }
   }
 
   async function loadCloudWorkspace(user, seedIfMissing = false) {

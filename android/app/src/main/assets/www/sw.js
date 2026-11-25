@@ -1,4 +1,4 @@
-const CACHE_NAME = "xundian-cloud-v21";
+const CACHE_NAME = "xundian-cloud-v22";
 const ASSETS = [
   "./",
   "./index.html",
