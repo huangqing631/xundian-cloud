@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="巡店云：面向巴布豆商丘区域总经理、督导和门店人员的门店巡检与任务协同应用。"
+    />
+    <meta name="theme-color" content="#ff5a3d" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="巡店云" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>巡店云 · 巴布豆门店运营</title>
+  </head>
+  <body>
+    <div id="app" aria-live="polite" aria-busy="true">
+      <div class="boot-screen" role="status" aria-label="巡店云正在加载">
+        <img src="./icon-192.png" alt="" />
+        <div>
+          <strong>巡店云</strong>
+          <span>正在加载门店数据…</span>
+        </div>
+        <i class="boot-spinner"></i>
+      </div>
+    </div>
+    <div id="network-badge" class="network-badge" hidden>
+      离线模式 · 操作保存在本机
+    </div>
+    <div id="camera-root"></div>
+    <div id="modal-root"></div>
+    <div id="drawer-root"></div>
+    <div id="toast-root" class="toast-root" aria-live="assertive"></div>
+
+    <script src="./app.js"></script>
+    <noscript>请启用 JavaScript 后使用巡店云。</noscript>
+  </body>
+</html>
