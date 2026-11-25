@@ -42,7 +42,9 @@
 
     <script>
       window.XUNDIAN_CLOUD_API_BASE =
-        "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/api";
+        /(\.tcloudbase\.com|\.tcloudbaseapp\.com)$/.test(location.hostname)
+          ? `${location.origin}/api`
+          : "";
     </script>
     <script src="./app.js"></script>
     <noscript>请启用 JavaScript 后使用巡店云。</noscript>

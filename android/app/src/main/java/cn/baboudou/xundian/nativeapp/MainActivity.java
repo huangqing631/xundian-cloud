@@ -24,6 +24,12 @@ import android.widget.Toast;
 import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
+    private static final String CLOUD_APP_HOST =
+        "inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com";
+    private static final String CLOUD_APP_URL =
+        "https://" + CLOUD_APP_HOST + "/web/index.html?native=1";
+    private static final String LOCAL_APP_URL =
+        "https://appassets.androidplatform.net/assets/www/index.html?native=1";
     private static final int FILE_CHOOSER_REQUEST = 4101;
     private static final int CAMERA_PERMISSION_REQUEST = 4102;
     private static final int NOTIFICATION_PERMISSION_REQUEST = 4103;
@@ -93,7 +99,10 @@ public class MainActivity extends Activity {
                     WebResourceRequest request
                 ) {
                     Uri uri = request.getUrl();
-                    if ("appassets.androidplatform.net".equals(uri.getHost())) {
+                    if (
+                        "appassets.androidplatform.net".equals(uri.getHost()) ||
+                        CLOUD_APP_HOST.equals(uri.getHost())
+                    ) {
                         return false;
                     }
                     if ("https".equals(uri.getScheme())) {
@@ -104,6 +113,22 @@ public class MainActivity extends Activity {
                         return true;
                     }
                     return true;
+                }
+
+                @Override
+                public void onReceivedError(
+                    WebView view,
+                    WebResourceRequest request,
+                    android.webkit.WebResourceError error
+                ) {
+                    if (request.isForMainFrame()) {
+                        Toast.makeText(
+                            MainActivity.this,
+                            "网络不可用，已进入离线模式",
+                            Toast.LENGTH_SHORT
+                        ).show();
+                        view.loadUrl(LOCAL_APP_URL);
+                    }
                 }
             }
         );
@@ -147,9 +172,7 @@ public class MainActivity extends Activity {
             }
         );
 
-        webView.loadUrl(
-            "https://appassets.androidplatform.net/assets/www/index.html?native=1"
-        );
+        webView.loadUrl(CLOUD_APP_URL);
         requestNotificationPermission();
     }
 
