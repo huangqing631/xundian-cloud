@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.20";
+  const APP_VERSION = "2026.11.25.21";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -4055,7 +4055,9 @@
                         <td><span class="badge ${
                           account.status === "启用" ? "success" : "warning"
                         }">${escapeHtml(account.status)}</span></td>
-                        <td><div class="table-action-group"><button class="button button-secondary button-sm" data-action="toggle-account" data-account-id="${
+                        <td><div class="table-action-group"><button class="button button-secondary button-sm" data-action="edit-account" data-account-id="${
+                          account.id
+                        }">编辑</button><button class="button button-secondary button-sm" data-action="toggle-account" data-account-id="${
                           account.id
                         }">${account.status === "启用" ? "停用" : "启用"}</button><button class="button button-ghost button-sm" data-action="reset-account-pin" data-account-id="${
                           account.id
@@ -5980,6 +5982,42 @@
     `;
   }
 
+  function openEditAccountModal(accountId) {
+    const account = state.accounts.find((item) => item.id === accountId);
+    if (!account) return;
+    const isCurrent = account.id === state.currentAccountId;
+    document.getElementById("modal-root").innerHTML = `
+      <div class="modal-backdrop">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="editAccountTitle">
+          <div class="modal-header">
+            <div><div class="eyebrow">人员账号</div><h2 id="editAccountTitle">编辑人员信息</h2><p>修改后会同步更新该人员的登录账号、角色和数据权限。</p></div>
+            <button class="close-button" data-action="close-modal">${icon("x")}</button>
+          </div>
+          <form id="editAccountForm">
+            <input type="hidden" name="accountId" value="${escapeHtml(account.id)}" />
+            <div class="modal-body">
+              <div class="form-grid">
+                <div class="form-field"><label>姓名</label><input class="form-control" name="name" value="${escapeHtml(account.name)}" required /></div>
+                <div class="form-field"><label>手机号</label><input class="form-control" name="phone" inputmode="tel" value="${escapeHtml(account.phone)}" required /></div>
+                <div class="form-field"><label>登录账号</label><input class="form-control" name="loginId" autocomplete="off" value="${escapeHtml(account.loginId)}" required /></div>
+                <div class="form-field"><label>账号角色</label><select class="form-control" name="role" ${isCurrent ? "disabled" : ""}><option ${account.role === "门店小伙伴" ? "selected" : ""}>门店小伙伴</option><option ${account.role === "督导" ? "selected" : ""}>督导</option><option ${account.role === "区域经理" ? "selected" : ""}>区域经理</option></select></div>
+                <div class="form-field"><label>所属门店 / 区域</label><select class="form-control" name="storeId"><option value="">全区域</option>${state.stores
+                  .map(
+                    (store) =>
+                      `<option value="${store.id}" ${store.id === account.storeId ? "selected" : ""}>${escapeHtml(store.name)}</option>`,
+                  )
+                  .join("")}</select></div>
+                <div class="form-field"><label>状态</label><select class="form-control" name="status" ${isCurrent ? "disabled" : ""}><option ${account.status === "启用" ? "selected" : ""}>启用</option><option ${account.status === "待启用" ? "selected" : ""}>待启用</option><option ${account.status === "停用" ? "selected" : ""}>停用</option></select></div>
+              </div>
+              ${isCurrent ? `<div class="form-hint" style="margin-top:12px">当前登录账号不能在这里修改角色或停用，避免误锁住管理权限。</div>` : ""}
+            </div>
+            <div class="modal-footer"><button type="button" class="button button-secondary" data-action="close-modal">取消</button><button type="submit" class="button button-primary">保存修改</button></div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
   function openAssignTaskModal() {
     ui.assignTaskPhotos = [];
     const supervisors = state.accounts.filter(
@@ -7605,6 +7643,10 @@
       openAddAccountModal();
       return;
     }
+    if (action === "edit-account") {
+      openEditAccountModal(target.dataset.accountId);
+      return;
+    }
     if (action === "toggle-account") {
       const account = state.accounts.find(
         (item) => item.id === target.dataset.accountId,
@@ -8281,6 +8323,10 @@
       const data = new FormData(event.target);
       const role = data.get("role");
       const selectedStore = storeById(data.get("storeId"));
+      if (role === "门店小伙伴" && !selectedStore) {
+        showToast("请选择门店小伙伴所属门店", "error");
+        return;
+      }
       const loginId = String(data.get("loginId") || "").trim().toLowerCase();
       const pin = String(data.get("pin") || "").trim();
       if (!loginId || pin.length < 6) {
@@ -8316,6 +8362,53 @@
       closeModal();
       renderApp();
       showToast("人员账号已新增");
+      return;
+    }
+    if (event.target.id === "editAccountForm") {
+      event.preventDefault();
+      const data = new FormData(event.target);
+      const account = state.accounts.find(
+        (item) => item.id === data.get("accountId"),
+      );
+      if (!account) return;
+      const loginId = String(data.get("loginId") || "").trim().toLowerCase();
+      if (!loginId) {
+        showToast("登录账号不能为空", "error");
+        return;
+      }
+      if (
+        state.accounts.some(
+          (item) =>
+            item.id !== account.id &&
+            String(item.loginId || "").toLowerCase() === loginId,
+        )
+      ) {
+        showToast("该登录账号已被其他人员使用", "error");
+        return;
+      }
+      const role = normalizeAccountRole(data.get("role") || account.role);
+      const selectedStore = storeById(data.get("storeId"));
+      if (role === "门店小伙伴" && !selectedStore) {
+        showToast("请选择门店小伙伴所属门店", "error");
+        return;
+      }
+      account.name = String(data.get("name") || "").trim();
+      account.phone = String(data.get("phone") || "").trim();
+      account.loginId = loginId;
+      account.role = role;
+      account.storeId =
+        role === "门店小伙伴" ? selectedStore?.id || "" : "";
+      account.store =
+        role === "门店小伙伴"
+          ? selectedStore?.name || "未绑定门店"
+          : role === "督导"
+            ? "商丘区域"
+            : "全区域";
+      account.status = String(data.get("status") || account.status);
+      saveState();
+      closeModal();
+      renderApp();
+      showToast("人员信息已更新并同步到云端");
       return;
     }
     if (event.target.id === "assignTaskForm") {
