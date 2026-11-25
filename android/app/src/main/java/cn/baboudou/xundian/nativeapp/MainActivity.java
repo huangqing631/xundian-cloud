@@ -68,10 +68,6 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             settings.setSafeBrowsingEnabled(true);
         }
-        if (BuildConfig.DEBUG) {
-            WebView.setWebContentsDebuggingEnabled(true);
-        }
-
         final WebViewAssetLoader assetLoader =
             new WebViewAssetLoader.Builder()
                 .addPathHandler(
