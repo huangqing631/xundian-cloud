@@ -1,9 +1,12 @@
 {
-  "version": "2026.11.25.15",
+  "version": "2026.11.25.16",
+  "nativeVersion": "1.0.2",
+  "downloadUrl": "https://huangqing631.github.io/xundian-cloud/xundian-cloud-native.apk",
   "releasedAt": "2026-11-25T20:05:00+08:00",
-  "title": "Android 原生版发布",
+  "title": "原生版通知与更新中心",
   "notes": [
-    "Android 改为本地内置原生版，不再跳转浏览器",
+    "原生版增加远程版本检测和更新通知",
+    "Android 原生版不再跳转浏览器",
     "新增系统通知权限申请、任务通知与到期提醒",
     "保留门店设置、人员账号设置和管理中心",
     "支持总经理下发督导任务与门店运营任务",
