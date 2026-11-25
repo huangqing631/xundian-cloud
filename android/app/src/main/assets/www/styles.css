@@ -4365,6 +4365,49 @@ textarea.form-control {
   padding: 4px 16px 100px;
 }
 
+.store-mobile-heading strong {
+  font-size: 16px;
+}
+
+.store-mobile-heading span {
+  font-size: 10px;
+}
+
+.store-mobile .mobile-greeting p {
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.store-mobile .mobile-section-title h2 {
+  font-size: 16px;
+}
+
+.store-mobile .mobile-section-title button {
+  font-size: 10px;
+}
+
+.store-mobile .mobile-quick {
+  font-size: 10px;
+}
+
+.store-mobile .mobile-issue-head strong {
+  font-size: 12px;
+}
+
+.store-mobile .mobile-issue-meta {
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
+.store-mobile .mobile-tab {
+  font-size: 8.5px;
+}
+
+.store-mobile .mobile-score-top,
+.store-mobile .mobile-score-meta {
+  font-size: 9.5px;
+}
+
 .mobile-greeting {
   padding: 4px 3px 14px;
 }
@@ -4496,6 +4539,7 @@ textarea.form-control {
 }
 
 .mobile-quick {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4506,6 +4550,24 @@ textarea.form-control {
   border-radius: 13px;
   font-size: 8px;
   font-weight: 650;
+}
+
+.mobile-quick-badge {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  color: #fff;
+  background: var(--brand);
+  border: 2px solid #fff;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .mobile-quick-icon {

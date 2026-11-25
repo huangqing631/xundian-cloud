@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.31";
+  const APP_VERSION = "2026.11.25.32";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -1721,6 +1721,8 @@
           : task.status === "submitted"
             ? "pending_review"
             : "not_submitted"),
+      priority:
+        task.priority || (task.status === "urgent" ? "紧急" : "普通"),
       createdBy:
         normalizeAccountRole(task.createdBy) || "督导现场",
     }));
@@ -3263,14 +3265,14 @@
   }
 
   function renderPreviewTaskList() {
-    const tasks = state.tasks
-      .filter(
+    const tasks = sortTasksByPriorityAndDue(
+      state.tasks.filter(
         (task) =>
           task.status !== "completed" &&
           (state.role !== "supervisor" ||
             task.assigneeRole === "supervisor"),
-      )
-      .slice(0, 3);
+      ),
+    ).slice(0, 3);
     return tasks
       .map((task) => {
         const store = storeById(task.storeId);
@@ -3707,18 +3709,85 @@
   }
 
   function filteredTasks() {
-    return state.tasks.filter((task) => {
-      const store = storeById(task.storeId);
-      const assigneeMatch =
-        state.role !== "supervisor" || task.assigneeRole === "supervisor";
-      const statusMatch =
-        ui.taskFilter === "all" ||
-        (ui.taskFilter === "pending" &&
-          ["pending", "urgent"].includes(task.status)) ||
-        task.status === ui.taskFilter;
-      const query = ui.taskQuery.trim().toLowerCase();
-      const text = `${task.title} ${store?.name || "商丘区域"} ${task.inspector}`.toLowerCase();
-      return assigneeMatch && statusMatch && (!query || text.includes(query));
+    return sortTasksByPriorityAndDue(
+      state.tasks.filter((task) => {
+        const store = storeById(task.storeId);
+        const assigneeMatch =
+          state.role !== "supervisor" || task.assigneeRole === "supervisor";
+        const statusMatch =
+          ui.taskFilter === "all" ||
+          (ui.taskFilter === "pending" &&
+            ["pending", "urgent"].includes(task.status)) ||
+          task.status === ui.taskFilter;
+        const query = ui.taskQuery.trim().toLowerCase();
+        const text = `${task.title} ${store?.name || "商丘区域"} ${task.inspector}`.toLowerCase();
+        return assigneeMatch && statusMatch && (!query || text.includes(query));
+      }),
+    );
+  }
+
+  function taskPriorityRank(task) {
+    if (task.status === "completed") return -1;
+    if (task.status === "urgent" || task.reviewStatus === "rejected") return 3;
+    return (
+      {
+        紧急: 3,
+        重要: 2,
+        普通: 1,
+      }[task.priority] || 1
+    );
+  }
+
+  function taskDueTimestamp(task) {
+    const label = String(task.dueLabel || "").trim();
+    const now = new Date();
+    let match = label.match(
+      /(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?/,
+    );
+    if (match) {
+      return new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+        Number(match[4] || 23),
+        Number(match[5] || 59),
+      ).getTime();
+    }
+    match = label.match(/^(今天|明天)\s*(\d{1,2}):(\d{2})/);
+    if (match) {
+      const date = new Date(now);
+      if (match[1] === "明天") date.setDate(date.getDate() + 1);
+      date.setHours(Number(match[2]), Number(match[3]), 0, 0);
+      return date.getTime();
+    }
+    match = label.match(/(\d{1,2})月\s*(\d{1,2})日/);
+    if (match) {
+      return new Date(
+        now.getFullYear(),
+        Number(match[1]) - 1,
+        Number(match[2]),
+        23,
+        59,
+      ).getTime();
+    }
+    if (label.includes("现场发起")) {
+      const time = label.match(/(\d{1,2}):(\d{2})/);
+      const date = new Date(now);
+      if (time) date.setHours(Number(time[1]), Number(time[2]), 0, 0);
+      return date.getTime();
+    }
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  function sortTasksByPriorityAndDue(tasks) {
+    return [...tasks].sort((left, right) => {
+      const priorityDiff =
+        taskPriorityRank(right) - taskPriorityRank(left);
+      if (priorityDiff !== 0) return priorityDiff;
+      const dueDiff =
+        taskDueTimestamp(left) - taskDueTimestamp(right);
+      if (dueDiff !== 0) return dueDiff;
+      return String(left.id).localeCompare(String(right.id));
     });
   }
 
@@ -4980,9 +5049,11 @@
   }
 
   function mobileStoreOperationalTasks() {
-    return state.tasks.filter(
-      (task) =>
-        task.storeId === state.storeId && task.assigneeRole === "store",
+    return sortTasksByPriorityAndDue(
+      state.tasks.filter(
+        (task) =>
+          task.storeId === state.storeId && task.assigneeRole === "store",
+      ),
     );
   }
 
@@ -5022,6 +5093,7 @@
                 "camera",
                 "icon-sm",
               )}</span>
+              <span class="mobile-quick-badge">${mobileIssuesForStore().length}</span>
               待整改
             </button>
             <button class="mobile-quick" data-action="mobile-tab" data-mobile-tab="tasks">
@@ -5029,6 +5101,7 @@
                 "list-checks",
                 "icon-sm",
               )}</span>
+              <span class="mobile-quick-badge">${mobileStoreOperationalTasks().filter((task) => !["completed", "submitted"].includes(task.status)).length}</span>
               日常任务
             </button>
             <button class="mobile-quick" data-action="open-learning">
@@ -6733,6 +6806,7 @@
                   )
                   .join("")}</select></div>
                 <div class="form-field full"><label>任务标题</label><input class="form-control" name="title" required placeholder="例如：复查消防通道整改情况" /></div>
+                <div class="form-field"><label>任务优先级</label><select class="form-control" name="priority"><option>普通</option><option>重要</option><option>紧急</option></select></div>
                 <div class="form-field"><label>完成期限</label><input class="form-control" type="date" name="due" value="2026-11-28" required /></div>
                 <div class="form-field full"><label>任务说明</label><textarea class="form-control" name="description" placeholder="说明任务背景、完成要求和审核标准"></textarea></div>
                 <div class="form-field full">
@@ -9398,6 +9472,7 @@
         templateId: taskType === "inspection" ? "tpl-daily" : null,
         taskType,
         assigneeRole,
+        priority: String(data.get("priority") || "普通"),
         status: "pending",
         reviewStatus: "not_submitted",
         progress: 0,
