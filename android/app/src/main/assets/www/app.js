@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.25";
+  const APP_VERSION = "2026.11.25.28";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -114,6 +114,148 @@
     督导: "supervisor",
     门店小伙伴: "store",
   };
+
+  const learningCourses = [
+    {
+      id: "learn-daily-ops",
+      title: "门店日常运营标准",
+      category: "运营基础",
+      duration: "8 分钟",
+      icon: "store",
+      summary: "掌握开店、营业中、闭店三个阶段的核心运营动作。",
+      sections: [
+        {
+          title: "营业前准备",
+          content:
+            "提前完成门头、橱窗、地面和货架清洁，检查灯光、音响、收银和库存系统。确认当日活动物料、重点商品和人员排班已经到位。",
+        },
+        {
+          title: "营业中管理",
+          content:
+            "保持主通道畅通，及时补货和整理陈列。主动迎宾，关注顾客需求，按要求执行当期活动，并持续维护门店卫生。",
+        },
+        {
+          title: "闭店检查",
+          content:
+            "完成收银对账、库存归位和垃圾清理，检查水电、消防通道和门窗安全，完整填写闭店记录。",
+        },
+      ],
+    },
+    {
+      id: "learn-display",
+      title: "商品陈列与价签规范",
+      category: "商品管理",
+      duration: "7 分钟",
+      icon: "layout",
+      summary: "让主推商品更醒目，价签准确，货架保持整齐。",
+      sections: [
+        {
+          title: "陈列原则",
+          content:
+            "按照品牌、品类和尺码逻辑陈列，商品最外侧与货架外沿平齐。主推款放置在高曝光位置，畅销商品不得断货。",
+        },
+        {
+          title: "价签与活动信息",
+          content:
+            "每件商品必须有对应价签，价格、活动时间和促销内容必须准确。活动结束后要及时撤除过期物料。",
+        },
+        {
+          title: "补货与仓储",
+          content:
+            "营业中及时补齐货架商品，仓库按品类分区摆放，保持通道顺畅，外采商品控制合理库存。",
+        },
+      ],
+    },
+    {
+      id: "learn-service",
+      title: "顾客接待与服务礼仪",
+      category: "服务标准",
+      duration: "6 分钟",
+      icon: "user",
+      summary: "学习迎宾、需求判断、商品推荐和顾客离店的标准流程。",
+      sections: [
+        {
+          title: "主动迎宾",
+          content:
+            "顾客进店后主动问候，保持微笑和适当距离。观察顾客关注区域，在不打扰的前提下及时提供帮助。",
+        },
+        {
+          title: "需求判断与推荐",
+          content:
+            "通过提问了解使用场景、尺码和预算，结合商品卖点进行推荐。避免只回答价格，要说明商品价值和适用场景。",
+        },
+        {
+          title: "会员与离店服务",
+          content:
+            "介绍会员权益和当期活动，完成结账后说明售后方式并礼貌送客。顾客离店后及时恢复陈列。",
+        },
+      ],
+    },
+    {
+      id: "learn-safety",
+      title: "消防与门店安全",
+      category: "安全管理",
+      duration: "5 分钟",
+      icon: "shield",
+      summary: "识别消防、用电和人员安全风险，掌握异常上报流程。",
+      sections: [
+        {
+          title: "消防检查",
+          content:
+            "消防通道不得堆放商品和纸箱，灭火器需在有效期内且压力正常。发现隐患要立即处理并上报督导。",
+        },
+        {
+          title: "用电安全",
+          content:
+            "禁止私拉插排和使用未经批准的大功率电器。发现线路发热、异味或破损必须停止使用并联系负责人。",
+        },
+        {
+          title: "突发事件处理",
+          content:
+            "遇到火情、人员受伤或重大设备故障时，优先确保人员安全，按应急预案处理，并第一时间联系区域经理。",
+        },
+      ],
+    },
+  ];
+
+  const learningExamQuestions = [
+    {
+      id: "q1",
+      question: "商品陈列最外侧应如何处理？",
+      options: ["随意摆放", "与货架外沿平齐", "全部向后推", "只展示一件"],
+      answer: 1,
+    },
+    {
+      id: "q2",
+      question: "消防通道的正确要求是？",
+      options: ["可临时放货", "保持畅通无遮挡", "闭店后再清理", "只允许放纸箱"],
+      answer: 1,
+    },
+    {
+      id: "q3",
+      question: "顾客进店后首先应做什么？",
+      options: ["等待顾客询问", "主动问候并观察需求", "立即推销最贵商品", "整理收银台"],
+      answer: 1,
+    },
+    {
+      id: "q4",
+      question: "发现商品价签与系统价格不一致时，应？",
+      options: ["先不处理", "立即核对并更正价签", "让顾客自行判断", "撤掉全部商品"],
+      answer: 1,
+    },
+    {
+      id: "q5",
+      question: "发现灭火器过期，正确做法是？",
+      options: ["继续使用", "记录后月底处理", "立即更换并上报", "移到仓库"],
+      answer: 2,
+    },
+    {
+      id: "q6",
+      question: "闭店前必须完成哪项工作？",
+      options: ["只关灯", "收银对账、安全检查并填写闭店记录", "只倒垃圾", "直接离开"],
+      answer: 1,
+    },
+  ];
 
   function normalizeAccountRole(role) {
     if (role === "总经理") return "区域经理";
@@ -1647,6 +1789,8 @@
   }
 
   let state = normalizeAppState(loadState());
+  let learningProgress = [];
+  let learningLoaded = false;
   const ui = {
     taskFilter: "all",
     taskQuery: "",
@@ -2783,6 +2927,11 @@
         count: openTaskCount(),
       },
       {
+        id: "learning",
+        label: "学习中心",
+        icon: "award",
+      },
+      {
         id: "issues",
         label: isSupervisor ? "整改跟进" : "整改总览",
         icon: "alert",
@@ -2895,6 +3044,7 @@
       {
         overview: state.role === "supervisor" ? "巡店打卡" : "经营看板",
         tasks: state.role === "supervisor" ? "我的任务" : "任务中心",
+        learning: "学习中心",
         issues: state.role === "supervisor" ? "整改跟进" : "整改总览",
         stores: "门店档案",
         "store-settings": "门店设置",
@@ -2928,6 +3078,7 @@
             ${icon("bell")}
             <span class="notification-dot"></span>
           </button>
+          <button class="icon-button" data-action="feedback-center" aria-label="反馈与建议" title="反馈与建议">${icon("message")}</button>
           ${isNativeApp ? "" : `<a class="icon-button" href="./xundian-cloud-native.apk" download aria-label="下载 Android App" title="下载 Android App">${icon("download")}</a>`}
           <button class="logout-text-button" data-action="logout">退出</button>
           ${renderAvatar(currentAccount()?.name || "用户", "avatar-green")}
@@ -3643,7 +3794,14 @@
                       taskTypeLabel(task),
                     )} · ${escapeHtml(task.createdBy || "系统")}下发
                   </div>
-                  ${actionMarkup}
+                  <div class="task-card-actions">
+                    ${actionMarkup}
+                    ${
+                      state.role === "hq"
+                        ? `<button class="button button-ghost button-sm task-delete-button" data-action="delete-task" data-task-id="${task.id}">删除</button>`
+                        : ""
+                    }
+                  </div>
                 </div>
               </article>
             `;
@@ -4764,6 +4922,7 @@
     const pages = {
       overview: renderOverviewPage,
       tasks: renderTasksPage,
+      learning: renderLearningPage,
       issues: renderIssuesPage,
       stores: renderStoresPage,
       "store-settings": renderStoreSettingsPage,
@@ -4841,12 +5000,12 @@
               )}</span>
               运营任务
             </button>
-            <button class="mobile-quick" data-action="mobile-message">
+            <button class="mobile-quick" data-action="open-learning">
               <span class="mobile-quick-icon" style="--accent: var(--blue); --tint: var(--blue-soft)">${icon(
-                "message",
+                "award",
                 "icon-sm",
               )}</span>
-              异常报备
+              学习
             </button>
           </div>
         </section>
@@ -5152,6 +5311,7 @@
       { id: "home", label: "首页", icon: "home" },
       { id: "tasks", label: "任务", icon: "list-checks" },
       { id: "issues", label: "整改", icon: "alert" },
+      { id: "learning", label: "学习", icon: "award" },
       { id: "profile", label: "我的", icon: "user" },
     ];
     return `
@@ -5177,6 +5337,8 @@
     const page =
       ui.mobileTab === "tasks"
         ? renderMobileTaskCenter()
+        : ui.mobileTab === "learning"
+          ? renderLearningContent(true)
         : ui.mobileTab === "issues"
           ? renderMobileIssues()
           : ui.mobileTab === "history"
@@ -5189,6 +5351,7 @@
         <div class="store-portal-role" style="position: fixed; top: 22px; right: 24px; z-index: 20">
           <div class="store-portal-actions">
             ${renderRoleSelect()}
+            <button class="icon-button" data-action="feedback-center" aria-label="反馈与建议" title="反馈与建议">${icon("message")}</button>
             <button class="logout-text-button" data-action="logout">退出</button>
           </div>
         </div>
@@ -5356,6 +5519,7 @@
     await loadCloudWorkspace(result.user, true);
     startCloudPolling();
     await subscribeCloudPush();
+    await loadLearningProgress(false);
     return result.user;
   }
 
@@ -5379,6 +5543,7 @@
       await loadCloudWorkspace(session.user);
       startCloudPolling();
       await subscribeCloudPush();
+      await loadLearningProgress(false);
       return true;
     } catch (error) {
       if (error.status === 401) handleCloudUnauthorized();
@@ -5489,6 +5654,7 @@
           cloudManaged: true,
           pin: "",
         }));
+        state.deletedAccountIds = result.state.deletedAccountIds || [];
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       }
     } catch (error) {
@@ -5694,7 +5860,15 @@
       return;
     }
     if (account.role !== "区域经理") {
-      applyAccountAccess(account);
+      const accountView = viewRoleByAccountRole[account.role] || "store";
+      if (state.role !== accountView) {
+        applyAccountAccess(account);
+      } else {
+        state.rolePreview = false;
+        if (accountView === "store" && account.storeId) {
+          state.storeId = account.storeId;
+        }
+      }
     }
     if (
       account.role === "区域经理" &&
@@ -6174,6 +6348,285 @@
           </form>
         </div>
       </div>
+    `;
+  }
+
+  function feedbackTime(timestamp) {
+    if (!timestamp) return "";
+    return new Date(timestamp).toLocaleString("zh-CN", {
+      hour12: false,
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function renderFeedbackList(items) {
+    const root = document.getElementById("feedbackList");
+    if (!root) return;
+    if (!items.length) {
+      root.innerHTML = `<div class="empty-state"><strong>暂无反馈记录</strong><span>提交后会显示在这里。</span></div>`;
+      return;
+    }
+    root.innerHTML = items
+      .map(
+        (item) => `
+          <article class="feedback-item">
+            <div class="feedback-item-head">
+              <div><strong>${escapeHtml(item.category)}</strong><span>${escapeHtml(
+                item.name,
+              )} · ${escapeHtml(item.role)}${item.storeId ? ` · ${escapeHtml(storeById(item.storeId)?.name || item.storeId)}` : ""}</span></div>
+              <span class="badge ${item.status === "replied" ? "success" : "warning"}">${item.status === "replied" ? "已回复" : "待处理"}</span>
+            </div>
+            <p>${escapeHtml(item.content)}</p>
+            <small>${escapeHtml(feedbackTime(item.createdAt))}</small>
+            ${
+              item.reply
+                ? `<div class="feedback-reply"><strong>区域经理回复</strong><span>${escapeHtml(item.reply)}</span></div>`
+                : state.role === "hq"
+                  ? `<button class="button button-secondary button-sm" data-action="reply-feedback" data-feedback-id="${item.id}">回复反馈</button>`
+                  : ""
+            }
+          </article>
+        `,
+      )
+      .join("");
+  }
+
+  async function loadFeedbackList() {
+    const root = document.getElementById("feedbackList");
+    if (root) root.innerHTML = `<div class="form-hint">正在加载反馈…</div>`;
+    if (!CLOUD_API_BASE || !cloudToken()) {
+      if (root) root.innerHTML = `<div class="form-hint">当前离线，联网后可查看云端反馈。</div>`;
+      return;
+    }
+    try {
+      const result = await cloudRequest("/feedback");
+      renderFeedbackList(result.items || []);
+    } catch (error) {
+      if (root) {
+        root.innerHTML = `<div class="form-hint">${escapeHtml(error.message)}</div>`;
+      }
+    }
+  }
+
+  function openFeedbackModal() {
+    document.getElementById("modal-root").innerHTML = `
+      <div class="modal-backdrop">
+        <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
+          <div class="modal-header">
+            <div><div class="eyebrow">Feedback & suggestions</div><h2 id="feedbackTitle">反馈与建议</h2><p>${state.role === "hq" ? "查看全部人员反馈并回复" : "提交使用问题、功能建议或运营改进意见"}</p></div>
+            <button class="close-button" data-action="close-modal">${icon("x")}</button>
+          </div>
+          <div class="modal-body">
+            <form id="feedbackForm" class="feedback-form">
+              <div class="form-field"><label>反馈类型</label><select class="form-control" name="category"><option>功能建议</option><option>使用问题</option><option>数据问题</option><option>运营建议</option><option>其他反馈</option></select></div>
+              <div class="form-field"><label>反馈内容</label><textarea class="form-control" name="content" rows="4" maxlength="2000" required placeholder="请说明遇到的问题、使用场景和希望改进的方式"></textarea></div>
+              <div class="modal-footer" style="padding:8px 0 0"><span class="footer-info">提交后会通知区域经理</span><button class="button button-primary" type="submit">提交反馈</button></div>
+            </form>
+            <section class="feedback-history">
+              <div class="detail-section-title"><h3>${state.role === "hq" ? "全部反馈" : "我的反馈"}</h3></div>
+              <div id="feedbackList"></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    `;
+    loadFeedbackList();
+  }
+
+  function learningRecord(lessonId) {
+    return learningProgress.find((item) => item.lessonId === lessonId);
+  }
+
+  async function loadLearningProgress(shouldRender = true) {
+    if (!CLOUD_API_BASE || !cloudToken()) {
+      learningProgress = [];
+      learningLoaded = true;
+      return;
+    }
+    try {
+      const result = await cloudRequest("/learning/progress");
+      learningProgress = result.items || [];
+      learningLoaded = true;
+      if (
+        shouldRender &&
+        ((state.role === "store" && ui.mobileTab === "learning") ||
+          (state.role !== "store" && state.page === "learning"))
+      ) {
+        renderApp();
+      }
+    } catch {
+      learningLoaded = true;
+    }
+  }
+
+  async function saveLearningEvent({
+    lessonId,
+    status,
+    score = 0,
+    answers = [],
+    attempts = 0,
+  }) {
+    if (!CLOUD_API_BASE || !cloudToken()) {
+      showToast("当前离线，学习进度暂不能保存", "error");
+      return null;
+    }
+    try {
+      const result = await cloudRequest("/learning/progress", {
+        method: "POST",
+        body: JSON.stringify({
+          lessonId,
+          status,
+          score,
+          answers,
+          attempts,
+        }),
+      });
+      const index = learningProgress.findIndex(
+        (item) => item.lessonId === lessonId,
+      );
+      if (index >= 0) learningProgress[index] = result.item;
+      else learningProgress.push(result.item);
+      return result.item;
+    } catch (error) {
+      showToast(error.message || "学习进度保存失败", "error");
+      return null;
+    }
+  }
+
+  function openLearningCourse(courseId) {
+    const course = learningCourses.find((item) => item.id === courseId);
+    if (!course) return;
+    const record = learningRecord(course.id);
+    document.getElementById("modal-root").innerHTML = `
+      <div class="modal-backdrop">
+        <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="learningCourseTitle">
+          <div class="modal-header">
+            <div><div class="eyebrow">${escapeHtml(course.category)}</div><h2 id="learningCourseTitle">${escapeHtml(course.title)}</h2><p>${escapeHtml(course.summary)} · 预计 ${escapeHtml(course.duration)}</p></div>
+            <button class="close-button" data-action="close-modal">${icon("x")}</button>
+          </div>
+          <div class="modal-body">
+            <div class="learning-article">
+              ${course.sections
+                .map(
+                  (section, index) => `
+                    <section>
+                      <span>${String(index + 1).padStart(2, "0")}</span>
+                      <div><h3>${escapeHtml(section.title)}</h3><p>${escapeHtml(section.content)}</p></div>
+                    </section>
+                  `,
+                )
+                .join("")}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <span class="footer-info">${record?.status === "completed" ? "已完成学习" : "阅读完成后标记学习进度"}</span>
+            <button class="button button-secondary" data-action="close-modal">关闭</button>
+            <button class="button button-primary" data-action="complete-learning" data-lesson-id="${course.id}">${record?.status === "completed" ? "已完成" : "标记为已完成"}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function openLearningExam() {
+    const record = learningRecord("exam-daily-ops");
+    document.getElementById("modal-root").innerHTML = `
+      <div class="modal-backdrop">
+        <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="learningExamTitle">
+          <div class="modal-header">
+            <div><div class="eyebrow">Online exam</div><h2 id="learningExamTitle">日常运营考试</h2><p>共 ${learningExamQuestions.length} 题，满分 100 分，80 分及以上通过。${record ? `当前最佳成绩 ${record.score} 分` : ""}</p></div>
+            <button class="close-button" data-action="close-modal">${icon("x")}</button>
+          </div>
+          <form id="learningExamForm">
+            <div class="modal-body">
+              <div class="exam-question-list">
+                ${learningExamQuestions
+                  .map(
+                    (question, index) => `
+                      <fieldset class="exam-question">
+                        <legend><span>${index + 1}</span>${escapeHtml(question.question)}</legend>
+                        ${question.options
+                          .map(
+                            (option, optionIndex) => `
+                              <label><input type="radio" name="${question.id}" value="${optionIndex}" required /><span>${escapeHtml(option)}</span></label>
+                            `,
+                          )
+                          .join("")}
+                      </fieldset>
+                    `,
+                  )
+                  .join("")}
+              </div>
+            </div>
+            <div class="modal-footer"><span class="footer-info">提交后立即评分</span><button type="button" class="button button-secondary" data-action="close-modal">取消</button><button type="submit" class="button button-primary">提交考试</button></div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderLearningContent(mobile = false) {
+    const completed = learningCourses.filter(
+      (course) => learningRecord(course.id)?.status === "completed",
+    ).length;
+    const exam = learningRecord("exam-daily-ops");
+    return `
+      <div class="${mobile ? "mobile-learning" : "learning-center"}">
+        <section class="learning-hero">
+          <div>
+            <div class="eyebrow">Learning center</div>
+            <h2>学习与考试</h2>
+            <p>学习门店运营标准，完成课程后参加考试。</p>
+          </div>
+          <div class="learning-progress-ring">
+            <strong>${completed}/${learningCourses.length}</strong>
+            <span>课程完成</span>
+          </div>
+        </section>
+        <div class="learning-course-grid">
+          ${learningCourses
+            .map((course) => {
+              const record = learningRecord(course.id);
+              return `
+                <article class="learning-course-card">
+                  <div class="learning-course-icon">${icon(course.icon)}</div>
+                  <span class="badge ${record?.status === "completed" ? "success" : "info"}">${record?.status === "completed" ? "已完成" : course.category}</span>
+                  <h3>${escapeHtml(course.title)}</h3>
+                  <p>${escapeHtml(course.summary)}</p>
+                  <div class="learning-course-meta"><span>${icon("clock", "icon-sm")} ${escapeHtml(course.duration)}</span><button class="button button-secondary button-sm" data-action="open-learning-course" data-lesson-id="${course.id}">${record?.status === "completed" ? "复习课程" : "开始学习"}</button></div>
+                </article>
+              `;
+            })
+            .join("")}
+        </div>
+        <section class="learning-exam-card">
+          <div>
+            <span class="badge ${exam?.status === "passed" ? "success" : exam?.status === "failed" ? "warning" : "info"}">${exam?.status === "passed" ? "考试已通过" : exam?.status === "failed" ? "待补考" : "尚未考试"}</span>
+            <h3>日常运营在线考试</h3>
+            <p>${exam ? `最佳成绩 ${exam.score} 分 · 已参加 ${exam.attempts} 次` : `共 ${learningExamQuestions.length} 题，80 分及格`}</p>
+          </div>
+          <button class="button button-primary" data-action="open-learning-exam">${exam ? "再次考试" : "开始考试"}</button>
+        </section>
+      </div>
+    `;
+  }
+
+  function renderLearningPage() {
+    return `
+      <section>
+        <div class="page-header">
+          <div class="page-heading">
+            <div class="eyebrow">Learning & assessment</div>
+            <h1>学习中心</h1>
+            <p>内容学习、进度记录和在线考试统一管理。</p>
+          </div>
+          <div class="header-actions">${renderHeaderActions()}</div>
+        </div>
+        ${learningLoaded ? renderLearningContent(false) : `<div class="empty-state"><strong>正在加载学习进度</strong></div>`}
+      </section>
     `;
   }
 
@@ -7545,13 +7998,15 @@
       return;
     }
     state.page = page;
+    if (page === "learning") learningLoaded = false;
     saveState();
     closeDrawer();
     renderApp();
     window.scrollTo({ top: 0, behavior: "smooth" });
+    if (page === "learning") loadLearningProgress(true);
   }
 
-  document.addEventListener("click", (event) => {
+  document.addEventListener("click", async (event) => {
     const roleSelect = event.target.closest("[data-role-select]");
     if (roleSelect) return;
 
@@ -7866,6 +8321,9 @@
       state.accounts = state.accounts.filter(
         (item) => item.id !== account.id,
       );
+      state.deletedAccountIds = [
+        ...new Set([...(state.deletedAccountIds || []), account.id]),
+      ];
       saveState();
       renderApp();
       showToast(`账号「${account.name}」已删除`);
@@ -8101,6 +8559,81 @@
       enableDeviceNotifications();
       return;
     }
+    if (action === "feedback-center") {
+      openFeedbackModal();
+      return;
+    }
+    if (action === "open-learning") {
+      ui.mobileTab = "learning";
+      learningLoaded = false;
+      renderApp();
+      await loadLearningProgress(true);
+      return;
+    }
+    if (action === "open-learning-course") {
+      openLearningCourse(target.dataset.lessonId);
+      return;
+    }
+    if (action === "complete-learning") {
+      const lessonId = target.dataset.lessonId;
+      await saveLearningEvent({
+        lessonId,
+        status: "completed",
+        score: 0,
+        answers: [],
+        attempts: 0,
+      });
+      closeModal();
+      renderApp();
+      showToast("课程已标记为完成");
+      return;
+    }
+    if (action === "open-learning-exam") {
+      openLearningExam();
+      return;
+    }
+    if (action === "delete-task") {
+      if (currentAccount()?.role !== "区域经理" || state.role !== "hq") {
+        showToast("只有区域经理可以删除任务", "error");
+        return;
+      }
+      const task = taskById(target.dataset.taskId);
+      if (!task) return;
+      const firstConfirm = window.confirm(
+        `确定删除任务「${task.title}」吗？`,
+      );
+      if (!firstConfirm) return;
+      const secondConfirm = window.confirm(
+        "再次确认：任务删除后不可恢复，已完成反馈和审核记录也会从任务列表移除。确定继续吗？",
+      );
+      if (!secondConfirm) return;
+      state.tasks = state.tasks.filter((item) => item.id !== task.id);
+      delete state.drafts[task.id];
+      saveState();
+      closeModal();
+      renderApp();
+      showToast(`任务「${task.title}」已删除`);
+      return;
+    }
+    if (action === "reply-feedback") {
+      const feedbackId = target.dataset.feedbackId;
+      const reply = window.prompt("请输入回复内容");
+      if (!reply?.trim()) return;
+      try {
+        await cloudRequest("/feedback/reply", {
+          method: "POST",
+          body: JSON.stringify({
+            feedbackId,
+            reply: reply.trim(),
+          }),
+        });
+        showToast("反馈已回复");
+        await loadFeedbackList();
+      } catch (error) {
+        showToast(error.message || "回复失败", "error");
+      }
+      return;
+    }
     if (action === "open-help") {
       document.getElementById("modal-root").innerHTML = `
         <div class="modal-backdrop">
@@ -8124,17 +8657,15 @@
     }
     if (action === "mobile-tab") {
       ui.mobileTab = target.dataset.mobileTab;
+      if (ui.mobileTab === "learning") learningLoaded = false;
       renderApp();
+      if (ui.mobileTab === "learning") loadLearningProgress(true);
       return;
     }
     if (action === "mobile-submit-issue") {
       const issue = mobileIssuesForStore()[0];
       if (issue) openIssueDrawer(issue.id);
       else showToast("当前没有待整改问题");
-      return;
-    }
-    if (action === "mobile-message") {
-      showToast("异常报备入口已打开，可直接联系负责督导");
       return;
     }
     if (action === "mock-photo") {
@@ -8380,6 +8911,69 @@
   });
 
   document.addEventListener("submit", async (event) => {
+    if (event.target.id === "learningExamForm") {
+      event.preventDefault();
+      const data = new FormData(event.target);
+      const answers = learningExamQuestions.map((question) =>
+        Number(data.get(question.id)),
+      );
+      const correct = learningExamQuestions.filter(
+        (question, index) => answers[index] === question.answer,
+      ).length;
+      const score = Math.round(
+        (correct / learningExamQuestions.length) * 100,
+      );
+      const previous = learningRecord("exam-daily-ops");
+      const item = await saveLearningEvent({
+        lessonId: "exam-daily-ops",
+        status: score >= 80 ? "passed" : "failed",
+        score,
+        answers,
+        attempts: Number(previous?.attempts || 0) + 1,
+      });
+      if (!item) return;
+      closeModal();
+      renderApp();
+      showToast(
+        score >= 80
+          ? `考试通过，得分 ${score} 分`
+          : `本次得分 ${score} 分，未达到 80 分，请学习后补考`,
+        score >= 80 ? "success" : "error",
+      );
+      return;
+    }
+    if (event.target.id === "feedbackForm") {
+      event.preventDefault();
+      if (!CLOUD_API_BASE || !cloudToken()) {
+        showToast("当前离线，暂时无法提交反馈", "error");
+        return;
+      }
+      const data = new FormData(event.target);
+      const content = String(data.get("content") || "").trim();
+      if (content.length < 3) {
+        showToast("请至少填写 3 个字的反馈内容", "error");
+        return;
+      }
+      const submit = event.target.querySelector('[type="submit"]');
+      if (submit) submit.disabled = true;
+      try {
+        await cloudRequest("/feedback", {
+          method: "POST",
+          body: JSON.stringify({
+            category: data.get("category"),
+            content,
+          }),
+        });
+        event.target.reset();
+        showToast("反馈已提交，区域经理会收到通知");
+        await loadFeedbackList();
+      } catch (error) {
+        showToast(error.message || "反馈提交失败", "error");
+      } finally {
+        if (submit) submit.disabled = false;
+      }
+      return;
+    }
     if (event.target.id === "registrationRequestForm") {
       event.preventDefault();
       if (!CLOUD_API_BASE) {
