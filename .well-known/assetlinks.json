@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "cn.baboudou.xundian",
+        "sha256_cert_fingerprints": ["9F:31:16:64:3E:48:55:34:B4:22:29:14:F8:7E:1D:A9:21:2A:80:6D:81:9B:13:35:50:0C:67:1C:5A:07:21:99"]
+      }
+    }]
