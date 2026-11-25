@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.29";
+  const APP_VERSION = "2026.11.25.30";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -1816,81 +1816,6 @@
     if (!target.authenticated) {
       target.rolePreview = false;
     }
-    const addTaskIfMissing = (task) => {
-      if (!target.tasks.some((item) => item.id === task.id)) {
-        target.tasks.push(task);
-      }
-    };
-    addTaskIfMissing({
-      id: "task-op-001",
-      storeId: "st3",
-      title: "完成本月消防器材自查",
-      templateId: null,
-      taskType: "operation",
-      assigneeRole: "store",
-      status: "pending",
-      reviewStatus: "not_submitted",
-      progress: 0,
-      date: "28",
-      month: "11月",
-      dueLabel: "2026-11-28",
-      inspector: "门店小伙伴",
-      createdBy: "区域经理",
-      description: "检查灭火器有效期、压力表和消防通道，完成后提交文字与照片。",
-    });
-    addTaskIfMissing({
-      id: "task-op-002",
-      storeId: "st2",
-      title: "补齐会员活动陈列照片",
-      templateId: null,
-      taskType: "operation",
-      assigneeRole: "store",
-      status: "pending",
-      reviewStatus: "not_submitted",
-      progress: 0,
-      date: "26",
-      month: "11月",
-      dueLabel: "2026-11-26",
-      inspector: "门店小伙伴",
-      createdBy: "区域经理",
-      description: "将当前会员活动物料调整到位，并提交现场照片。",
-    });
-    addTaskIfMissing({
-      id: "task-sv-other-001",
-      storeId: "",
-      title: "整理本周门店经营复盘",
-      templateId: null,
-      taskType: "other",
-      assigneeRole: "supervisor",
-      status: "pending",
-      reviewStatus: "not_submitted",
-      progress: 0,
-      date: "26",
-      month: "11月",
-      dueLabel: "2026-11-26",
-      inspector: "黄庆",
-      createdBy: "区域经理",
-      description: "汇总本周销售、毛利、巡店与整改情况，提交复盘结果。",
-    });
-    addTaskIfMissing({
-      id: "task-op-review-001",
-      storeId: "st1",
-      title: "完成入口地垫更换",
-      templateId: null,
-      taskType: "operation",
-      assigneeRole: "store",
-      status: "submitted",
-      reviewStatus: "pending_review",
-      progress: 100,
-      date: "25",
-      month: "11月",
-      dueLabel: "2026-11-25",
-      inspector: "门店小伙伴",
-      createdBy: "区域经理",
-      description: "更换入口磨损地垫。",
-      completionNote: "旧地垫已撤除，新防滑地垫已铺设完成。",
-      completedAt: "2026-11-25",
-    });
     return target;
   }
 
