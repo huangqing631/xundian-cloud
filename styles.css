@@ -147,6 +147,10 @@ svg {
   transform: translateX(-50%);
 }
 
+.native-app a[href="./xundian-cloud.apk"] {
+  display: none !important;
+}
+
 @keyframes boot-spin {
   to {
     transform: rotate(360deg);
