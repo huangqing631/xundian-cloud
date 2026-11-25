@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.23";
+  const APP_VERSION = "2026.11.25.25";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -4182,7 +4182,7 @@
                           account.id
                         }">${account.status === "启用" ? "停用" : "启用"}</button><button class="button button-ghost button-sm" data-action="reset-account-pin" data-account-id="${
                           account.id
-                        }">重置密码</button></div></td>
+                        }">重置密码</button>${account.id === state.currentAccountId ? "" : `<button class="button button-danger button-sm" data-action="delete-account" data-account-id="${account.id}">删除</button>`}</div></td>
                       </tr>
                     `,
                   )
@@ -5648,7 +5648,38 @@
             <label>登录密码<input class="form-control" name="pin" type="password" inputmode="numeric" autocomplete="current-password" required placeholder="请输入密码" /></label>
             <button class="button button-primary login-submit" type="submit">${icon("arrow-right", "icon-sm")} 登录</button>
           </form>
+          <button class="login-register-button" type="button" data-action="show-registration">申请注册</button>
           <div class="login-footnote">${icon("shield", "icon-sm")} 登录后会按账号角色限制可访问的工作台，初始账号请向区域经理获取</div>
+        </div>
+      </div>
+    `;
+    root.setAttribute("aria-busy", "false");
+  }
+
+  function renderRegistrationScreen() {
+    const root = document.getElementById("app");
+    root.innerHTML = `
+      <div class="login-shell">
+        <div class="login-card">
+          <div class="login-brand-mark">${icon("user")}</div>
+          <div class="eyebrow">Account registration</div>
+          <h1>申请注册</h1>
+          <p class="login-intro">提交后由区域经理审核。审核通过后，手机号作为登录账号，手机号后 6 位作为初始密码。</p>
+          <form id="registrationRequestForm" class="login-form">
+            <label>姓名<input class="form-control" name="name" maxlength="30" required /></label>
+            <label>手机号<input class="form-control" name="phone" inputmode="tel" autocomplete="tel" required /></label>
+            <label>申请角色<select class="form-control" name="requestedRole"><option>门店小伙伴</option><option>督导</option></select></label>
+            <label>所属门店（门店小伙伴必选）<select class="form-control" name="storeId"><option value="">请选择门店</option>${state.stores
+              .map(
+                (store) =>
+                  `<option value="${store.id}">${escapeHtml(store.name)}</option>`,
+              )
+              .join("")}</select></label>
+            <label>申请说明<textarea class="form-control" name="reason" rows="3" placeholder="可填写岗位、负责区域或加入原因"></textarea></label>
+            <button class="button button-primary login-submit" type="submit">提交申请</button>
+          </form>
+          <button class="login-register-button" type="button" data-action="back-to-login">返回登录</button>
+          <div class="login-footnote">${icon("shield", "icon-sm")} 申请提交后需由区域经理审批</div>
         </div>
       </div>
     `;
@@ -6171,11 +6202,17 @@
                 <div class="form-field full">
                   <label>任务说明图片</label>
                   <div class="assignment-photo-list" id="assignmentPhotoList"></div>
-                  <label class="photo-upload-button" for="assignmentPhotos">
-                    ${icon("image", "icon-sm")} 上传参考图片
-                  </label>
-                  <input class="photo-file-input" id="assignmentPhotos" type="file" accept="image/*" multiple data-assignment-photo-input />
-                  <div class="form-hint">可上传陈列标准、整改示例或现场参考图，最多 3 张。</div>
+                  <div class="execution-photo-actions">
+                    <label class="photo-upload-button" for="assignmentPhotosAlbum">
+                      ${icon("image", "icon-sm")} 从相册上传
+                    </label>
+                    <label class="photo-upload-button" for="assignmentPhotosCamera">
+                      ${icon("camera", "icon-sm")} 直接拍照
+                    </label>
+                    <input class="photo-file-input" id="assignmentPhotosAlbum" type="file" accept="image/*" multiple data-assignment-photo-input />
+                    <input class="photo-file-input" id="assignmentPhotosCamera" type="file" accept="image/*" capture="environment" data-assignment-photo-input />
+                    <div class="form-hint">可从相册上传，也可直接调用相机拍摄，最多 3 张。</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -7556,6 +7593,14 @@
       showToast("已退出登录");
       return;
     }
+    if (action === "show-registration") {
+      renderRegistrationScreen();
+      return;
+    }
+    if (action === "back-to-login") {
+      renderLoginScreen();
+      return;
+    }
     if (action === "navigate") {
       navigate(target.dataset.page);
       return;
@@ -7802,6 +7847,30 @@
       showToast(`「${account.name}」的登录密码已更新`);
       return;
     }
+    if (action === "delete-account") {
+      const account = state.accounts.find(
+        (item) => item.id === target.dataset.accountId,
+      );
+      if (!account) return;
+      if (account.id === state.currentAccountId) {
+        showToast("不能删除当前登录账号", "error");
+        return;
+      }
+      if (
+        !window.confirm(
+          `确认删除账号「${account.name}」吗？删除后该账号将无法登录。`,
+        )
+      ) {
+        return;
+      }
+      state.accounts = state.accounts.filter(
+        (item) => item.id !== account.id,
+      );
+      saveState();
+      renderApp();
+      showToast(`账号「${account.name}」已删除`);
+      return;
+    }
     if (action === "close-modal") {
       closeModal();
       return;
@@ -7938,18 +8007,58 @@
         (item) => item.id === target.dataset.approvalId,
       );
       if (!approval) return;
-      approval.status =
-        action === "approve-account" ? "approved" : "rejected";
+      const approving = action === "approve-account";
+      approval.status = approving ? "approved" : "rejected";
+      let createdCredentials = "";
+      if (approving && approval.phone && !approval.accountId) {
+        const phone = String(approval.phone).replace(/\D/g, "");
+        let loginId = phone;
+        let suffix = 2;
+        while (
+          state.accounts.some(
+            (item) =>
+              String(item.loginId || "").toLowerCase() ===
+              loginId.toLowerCase(),
+          )
+        ) {
+          loginId = `${phone}${suffix}`;
+          suffix += 1;
+        }
+        const pin = phone.slice(-6) || "123456";
+        const accountId = `ACC-REG-${Date.now()}`;
+        const role = normalizeAccountRole(
+          approval.requestedRole || "门店小伙伴",
+        );
+        const store = storeById(approval.storeId);
+        state.accounts.push({
+          id: accountId,
+          name: approval.name,
+          phone,
+          loginId,
+          pin,
+          role,
+          store:
+            role === "门店小伙伴"
+              ? store?.name || approval.store || "未绑定门店"
+              : role === "督导"
+                ? "商丘区域"
+                : "全区域",
+          storeId: role === "门店小伙伴" ? store?.id || "" : "",
+          status: "启用",
+        });
+        approval.accountId = accountId;
+        createdCredentials = `，账号 ${loginId}，初始密码 ${pin}`;
+      }
       saveState();
       renderApp();
       notifyDevice(
-        action === "approve-account" ? "账号申请已通过" : "账号申请已拒绝",
+        approving ? "账号申请已通过" : "账号申请已拒绝",
         `${approval.name} · ${approval.requestedRole}`,
         `approval:${approval.id}`,
       );
       showToast(
-        action === "approve-account"
-          ? `已通过 ${approval.name} 的 ${approval.requestedRole} 申请`
+        approving
+          ? `已通过 ${approval.name} 的 ${approval.requestedRole} 申请${createdCredentials}`
           : `已拒绝 ${approval.name} 的进入申请`,
       );
       return;
@@ -8271,6 +8380,52 @@
   });
 
   document.addEventListener("submit", async (event) => {
+    if (event.target.id === "registrationRequestForm") {
+      event.preventDefault();
+      if (!CLOUD_API_BASE) {
+        showToast("当前离线版暂不支持提交注册申请", "error");
+        return;
+      }
+      const data = new FormData(event.target);
+      const requestedRole = String(
+        data.get("requestedRole") || "门店小伙伴",
+      );
+      const storeId = String(data.get("storeId") || "");
+      if (requestedRole === "门店小伙伴" && !storeId) {
+        showToast("门店小伙伴必须选择所属门店", "error");
+        return;
+      }
+      const submit = event.target.querySelector('[type="submit"]');
+      if (submit) {
+        submit.disabled = true;
+        submit.textContent = "正在提交…";
+      }
+      try {
+        const result = await cloudRequest(
+          "/registration-requests",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              name: String(data.get("name") || "").trim(),
+              phone: String(data.get("phone") || "").trim(),
+              requestedRole,
+              storeId,
+              reason: String(data.get("reason") || "").trim(),
+            }),
+          },
+          "",
+        );
+        renderLoginScreen();
+        showToast(result.message || "申请已提交");
+      } catch (error) {
+        showToast(error.message || "注册申请提交失败", "error");
+        if (submit) {
+          submit.disabled = false;
+          submit.textContent = "提交申请";
+        }
+      }
+      return;
+    }
     if (event.target.id === "loginForm") {
       event.preventDefault();
       const data = new FormData(event.target);

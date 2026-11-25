@@ -4763,6 +4763,20 @@ textarea.form-control {
   margin-top: 4px;
 }
 
+.login-register-button {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px;
+  color: var(--brand-strong);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--brand) 24%, var(--line));
+  border-radius: 11px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 .login-demo {
   margin-top: 18px;
   padding: 12px 14px;
