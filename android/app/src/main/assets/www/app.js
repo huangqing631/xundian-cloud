@@ -2,7 +2,20 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.17";
+  const APP_VERSION = "2026.11.25.18";
+  const CLOUD_API_BASE = String(
+    window.XUNDIAN_CLOUD_API_BASE ||
+      localStorage.getItem("xundian-cloud-api-base") ||
+      "",
+  ).replace(/\/$/, "");
+  const CLOUD_TOKEN_KEY = "xundian-cloud-token";
+  const CLOUD_REVISION_KEY = "xundian-cloud-revision";
+  const CLOUD_NOTIFICATION_CURSOR_KEY = "xundian-cloud-notification-cursor";
+  let cloudReady = false;
+  let cloudRevision = Number(localStorage.getItem(CLOUD_REVISION_KEY) || 0);
+  let cloudSyncTimer = null;
+  let cloudSyncInFlight = false;
+  let cloudSyncAgain = false;
 
   const iconPaths = {
     home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
@@ -1424,7 +1437,10 @@
             ? "区域经理主账号"
             : account.phone,
         loginId,
-        pin: String(account.pin || fallback.pin || "123456"),
+        pin: account.cloudManaged
+          ? String(account.pin || "")
+          : String(account.pin || fallback.pin || "123456"),
+        cloudManaged: Boolean(account.cloudManaged),
         status: account.status || "启用",
       };
     });
@@ -1589,6 +1605,9 @@
         return;
       }
       const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        await subscribeCloudPush();
+      }
       showToast(
         permission === "granted"
           ? "消息提醒已开启"
@@ -1672,12 +1691,13 @@
       });
   }
 
-  function saveState() {
+  function saveState(options = {}) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       // The app remains functional when storage is unavailable.
     }
+    if (!options.skipCloud) scheduleCloudSync();
   }
 
   const storeById = (id) => state.stores.find((store) => store.id === id);
@@ -2014,11 +2034,15 @@
     max: 3,
     hardware: false,
   };
+  let availableCameraDevices = [];
+  let currentCameraDeviceId = "";
 
   function closeCameraCapture() {
     activeCameraStream?.getTracks().forEach((track) => track.stop());
     activeCameraStream = null;
     activeCameraZoom = { value: 1, min: 1, max: 3, hardware: false };
+    availableCameraDevices = [];
+    currentCameraDeviceId = "";
     const root = document.getElementById("camera-root");
     if (root) root.innerHTML = "";
   }
@@ -2053,6 +2077,7 @@
               <span id="cameraZoomLabel">1.0×</span>
               <input id="cameraZoom" type="range" min="1" max="3" step="0.1" value="1" aria-label="调整相机变焦" />
               <button data-action="camera-zoom-step" data-step="1" type="button" aria-label="放大">${icon("plus", "icon-sm")}</button>
+              <button class="camera-lens-button" data-action="cycle-camera-lens" type="button" aria-label="切换广角镜头"><span id="cameraLensLabel">广角</span></button>
             </div>
             <div class="camera-watermark-preview">
               <span>巡店现场</span>
@@ -2074,42 +2099,135 @@
     root.dataset.captureContext = JSON.stringify(options);
 
     try {
-      try {
-        activeCameraStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 960 },
-            aspectRatio: { ideal: 4 / 3 },
-          },
-          audio: false,
-        });
-      } catch {
-        activeCameraStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-      }
-      const video = document.getElementById("cameraVideo");
-      if (video) {
-        video.srcObject = activeCameraStream;
-        await video.play().catch(() => {});
-      }
-      const track = activeCameraStream.getVideoTracks?.()[0];
-      const capabilities = track?.getCapabilities?.() || {};
-      if (capabilities.zoom) {
-        activeCameraZoom = {
-          value: Math.max(1, capabilities.zoom.min || 1),
-          min: Math.max(1, capabilities.zoom.min || 1),
-          max: Math.min(capabilities.zoom.max || 4, 8),
-          hardware: true,
-        };
-        await applyCameraZoom(activeCameraZoom.value);
-      }
-      updateCameraZoomUi();
+      await startCameraStream("", true);
     } catch {
       closeCameraCapture();
       showToast("无法调用摄像头，请检查相机权限并使用手机打开", "error");
+    }
+  }
+
+  function isFrontCameraLabel(label) {
+    return /(front|user|前置|自拍)/i.test(String(label || ""));
+  }
+
+  function isWideCameraLabel(label) {
+    return /(ultra.?wide|ultrawide|wide|超广角|广角|0[.,]5\s*[x×]?)/i.test(
+      String(label || ""),
+    );
+  }
+
+  function updateCameraLensUi() {
+    const label = document.getElementById("cameraLensLabel");
+    if (!label) return;
+    const device = availableCameraDevices.find(
+      (item) => item.deviceId === currentCameraDeviceId,
+    );
+    label.textContent = isWideCameraLabel(device?.label)
+      ? "广角"
+      : availableCameraDevices.length > 1
+        ? "镜头"
+        : "广角";
+  }
+
+  async function startCameraStream(deviceId = "", preferWide = false) {
+    activeCameraStream?.getTracks().forEach((track) => track.stop());
+    activeCameraStream = null;
+    const baseVideo = {
+      width: { ideal: 1280 },
+      height: { ideal: 960 },
+      aspectRatio: { ideal: 4 / 3 },
+    };
+    try {
+      activeCameraStream = await navigator.mediaDevices.getUserMedia({
+        video: deviceId
+          ? { ...baseVideo, deviceId: { exact: deviceId } }
+          : { ...baseVideo, facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+    } catch {
+      activeCameraStream = await navigator.mediaDevices.getUserMedia({
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
+        audio: false,
+      });
+    }
+
+    const video = document.getElementById("cameraVideo");
+    if (video) {
+      video.srcObject = activeCameraStream;
+      await video.play().catch(() => {});
+    }
+    const track = activeCameraStream.getVideoTracks?.()[0];
+    const settings = track?.getSettings?.() || {};
+    currentCameraDeviceId = settings.deviceId || deviceId || "";
+    const capabilities = track?.getCapabilities?.() || {};
+    if (capabilities.zoom) {
+      const min = Math.max(0.1, Number(capabilities.zoom.min) || 1);
+      const max = Math.max(min, Math.min(Number(capabilities.zoom.max) || 4, 8));
+      activeCameraZoom = {
+        value: min,
+        min,
+        max,
+        hardware: true,
+      };
+      await applyCameraZoom(min);
+    } else {
+      activeCameraZoom = { value: 1, min: 1, max: 3, hardware: false };
+      updateCameraZoomUi();
+    }
+    if (
+      Array.isArray(capabilities.focusMode) &&
+      capabilities.focusMode.includes("continuous")
+    ) {
+      track
+        ?.applyConstraints({
+          advanced: [{ focusMode: "continuous" }],
+        })
+        .catch(() => {});
+    }
+
+    const devices = await (
+      navigator.mediaDevices.enumerateDevices?.() || Promise.resolve([])
+    ).catch(() => []);
+    availableCameraDevices = devices.filter(
+      (item) => item.kind === "videoinput",
+    );
+    const wideDevice = availableCameraDevices.find(
+      (item) =>
+        item.deviceId !== currentCameraDeviceId &&
+        isWideCameraLabel(item.label) &&
+        !isFrontCameraLabel(item.label),
+    );
+    if (preferWide && wideDevice) {
+      await startCameraStream(wideDevice.deviceId, false);
+      return;
+    }
+    updateCameraLensUi();
+  }
+
+  async function cycleCameraLens() {
+    if (availableCameraDevices.length < 2) {
+      showToast("当前手机只提供一个后置镜头");
+      return;
+    }
+    const rearCameras = availableCameraDevices.filter(
+      (item) => !isFrontCameraLabel(item.label),
+    );
+    const candidates = rearCameras.length
+      ? rearCameras
+      : availableCameraDevices;
+    const currentIndex = candidates.findIndex(
+      (item) => item.deviceId === currentCameraDeviceId,
+    );
+    const next = candidates[(currentIndex + 1) % candidates.length];
+    try {
+      await startCameraStream(next.deviceId, false);
+      showToast(
+        isWideCameraLabel(next.label)
+          ? "已切换到超广角镜头"
+          : `已切换镜头${next.label ? `：${next.label}` : ""}`,
+      );
+    } catch {
+      showToast("该镜头无法打开，请切换其他镜头", "error");
     }
   }
 
@@ -4977,6 +5095,402 @@
     );
   }
 
+  function cloudToken() {
+    return localStorage.getItem(CLOUD_TOKEN_KEY) || "";
+  }
+
+  async function cloudRequest(path, options = {}, token = cloudToken()) {
+    if (!CLOUD_API_BASE) throw new Error("尚未配置云端服务地址");
+    const response = await fetch(`${CLOUD_API_BASE}${path}`, {
+      ...options,
+      headers: {
+        ...(options.body ? { "content-type": "application/json" } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(data.error || `云端请求失败 (${response.status})`);
+      error.status = response.status;
+      error.data = data;
+      throw error;
+    }
+    return data;
+  }
+
+  function cloudAccountFromUser(user) {
+    return {
+      ...(state.accounts.find((item) => item.id === user.accountId) || {}),
+      id: user.accountId,
+      name: user.name,
+      loginId: user.loginId,
+      role: user.role,
+      storeId: user.storeId || "",
+      status: user.status,
+      cloudManaged: true,
+      pin: "",
+    };
+  }
+
+  function applyCloudWorkspace(remote, user, shouldRender = true) {
+    const account = cloudAccountFromUser(user);
+    const accounts = (remote.accounts || [account]).map((item) => ({
+      ...item,
+      cloudManaged: true,
+      pin: "",
+    }));
+    state = normalizeAppState({
+      ...state,
+      ...remote,
+      accounts,
+      currentAccountId: account.id,
+      authenticated: true,
+      rolePreview: false,
+    });
+    applyAccountAccess(currentAccount());
+    cloudReady = true;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (shouldRender) renderApp();
+  }
+
+  async function loadCloudWorkspace(user, seedIfMissing = false) {
+    try {
+      const remote = await cloudRequest("/workspace");
+      cloudRevision = Number(remote.revision || 0);
+      localStorage.setItem(CLOUD_REVISION_KEY, String(cloudRevision));
+      applyCloudWorkspace(remote.state, user);
+      return true;
+    } catch (error) {
+      if (error.status === 404 && seedIfMissing && user.role === "区域经理") {
+        const created = await cloudRequest("/workspace", {
+          method: "PUT",
+          body: JSON.stringify({ baseRevision: 0, state }),
+        });
+        cloudRevision = Number(created.revision || 1);
+        localStorage.setItem(CLOUD_REVISION_KEY, String(cloudRevision));
+        applyCloudWorkspace(created.state, user);
+        return true;
+      }
+      if (error.status === 401) {
+        handleCloudUnauthorized();
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  function handleCloudUnauthorized() {
+    localStorage.removeItem(CLOUD_TOKEN_KEY);
+    localStorage.removeItem(CLOUD_REVISION_KEY);
+    cloudReady = false;
+    state.authenticated = false;
+    state.rolePreview = false;
+    saveState({ skipCloud: true });
+    renderApp();
+  }
+
+  function syncNativeCloudSession() {
+    try {
+      if (nativeBridge?.setCloudSession && CLOUD_API_BASE && cloudToken()) {
+        nativeBridge.setCloudSession(CLOUD_API_BASE, cloudToken());
+      }
+    } catch {
+      // Native background polling is optional outside the Android shell.
+    }
+  }
+
+  async function loginWithCloud(loginId, password) {
+    const result = await cloudRequest(
+      "/auth/login",
+      {
+        method: "POST",
+        body: JSON.stringify({ loginId, password }),
+      },
+      "",
+    );
+    activeCloudUser = result.user;
+    localStorage.setItem(CLOUD_TOKEN_KEY, result.token);
+    syncNativeCloudSession();
+    const account = cloudAccountFromUser(result.user);
+    state.currentAccountId = account.id;
+    state.authenticated = true;
+    if (!state.accounts.some((item) => item.id === account.id)) {
+      state.accounts.push(account);
+    } else {
+      state.accounts = state.accounts.map((item) =>
+        item.id === account.id ? { ...item, ...account } : item,
+      );
+    }
+    applyAccountAccess(currentAccount());
+    await loadCloudWorkspace(result.user, true);
+    startCloudPolling();
+    await subscribeCloudPush();
+    return result.user;
+  }
+
+  async function restoreCloudSession() {
+    if (!CLOUD_API_BASE || !cloudToken()) return false;
+    try {
+      const session = await cloudRequest("/auth/me");
+      activeCloudUser = session.user;
+      syncNativeCloudSession();
+      state.currentAccountId = session.user.accountId;
+      state.authenticated = true;
+      const account = cloudAccountFromUser(session.user);
+      state.accounts = state.accounts.some(
+        (item) => item.id === account.id,
+      )
+        ? state.accounts.map((item) =>
+            item.id === account.id ? { ...item, ...account } : item,
+          )
+        : [...state.accounts, account];
+      applyAccountAccess(currentAccount());
+      await loadCloudWorkspace(session.user);
+      startCloudPolling();
+      await subscribeCloudPush();
+      return true;
+    } catch (error) {
+      if (error.status === 401) handleCloudUnauthorized();
+      return false;
+    }
+  }
+
+  async function uploadEmbeddedImages(value, token, cache) {
+    if (typeof value === "string") {
+      if (!value.startsWith("data:image/")) return value;
+      if (cache.has(value)) return cache.get(value);
+      const match = value.match(/^data:([^;]+);base64,(.+)$/);
+      if (!match) return value;
+      try {
+        const uploaded = await cloudRequest(
+          "/upload",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              mimeType: match[1],
+              dataBase64: match[2],
+            }),
+          },
+          token,
+        );
+        cache.set(value, uploaded.url);
+        return uploaded.url;
+      } catch {
+        return value;
+      }
+    }
+    if (Array.isArray(value)) {
+      const output = [];
+      for (const item of value) {
+        output.push(await uploadEmbeddedImages(item, token, cache));
+      }
+      return output;
+    }
+    if (value && typeof value === "object") {
+      const output = {};
+      for (const [key, item] of Object.entries(value)) {
+        output[key] = await uploadEmbeddedImages(item, token, cache);
+      }
+      return output;
+    }
+    return value;
+  }
+
+  async function syncCloudState() {
+    if (
+      !CLOUD_API_BASE ||
+      !cloudReady ||
+      !cloudToken() ||
+      !state.authenticated
+    ) {
+      return;
+    }
+    if (cloudSyncInFlight) {
+      cloudSyncAgain = true;
+      return;
+    }
+    cloudSyncInFlight = true;
+    try {
+      const token = cloudToken();
+      const snapshot = JSON.parse(JSON.stringify(state));
+      delete snapshot.authenticated;
+      delete snapshot.currentAccountId;
+      delete snapshot.rolePreview;
+      const cloudSnapshot = await uploadEmbeddedImages(
+        snapshot,
+        token,
+        new Map(),
+      );
+      let result;
+      try {
+        result = await cloudRequest(
+          "/workspace",
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              baseRevision: cloudRevision,
+              state: cloudSnapshot,
+            }),
+          },
+          token,
+        );
+      } catch (error) {
+        if (error.status !== 409) throw error;
+        const latest = await cloudRequest("/workspace", {}, token);
+        cloudRevision = Number(latest.revision || 0);
+        result = await cloudRequest(
+          "/workspace",
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              baseRevision: cloudRevision,
+              state: cloudSnapshot,
+            }),
+          },
+          token,
+        );
+      }
+      cloudRevision = Number(result.revision || cloudRevision + 1);
+      localStorage.setItem(CLOUD_REVISION_KEY, String(cloudRevision));
+      if (result.state?.accounts) {
+        state.accounts = result.state.accounts.map((item) => ({
+          ...item,
+          cloudManaged: true,
+          pin: "",
+        }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      }
+    } catch (error) {
+      if (error.status === 401) {
+        handleCloudUnauthorized();
+      } else {
+        showToast(`云端同步失败：${error.message}`, "error");
+      }
+    } finally {
+      cloudSyncInFlight = false;
+      if (cloudSyncAgain) {
+        cloudSyncAgain = false;
+        window.setTimeout(syncCloudState, 300);
+      }
+    }
+  }
+
+  function scheduleCloudSync() {
+    if (!CLOUD_API_BASE || !cloudReady || !cloudToken()) return;
+    window.clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = window.setTimeout(syncCloudState, 700);
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding)
+      .replaceAll("-", "+")
+      .replaceAll("_", "/");
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+  }
+
+  async function subscribeCloudPush() {
+    if (
+      !CLOUD_API_BASE ||
+      !cloudToken() ||
+      !("Notification" in window) ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window) ||
+      Notification.permission !== "granted"
+    ) {
+      return false;
+    }
+    try {
+      const config = await cloudRequest("/push/config", {}, cloudToken());
+      if (!config.supported || !config.publicKey) return false;
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(config.publicKey),
+        });
+      }
+      await cloudRequest(
+        "/push/subscribe",
+        {
+          method: "POST",
+          body: JSON.stringify({ subscription }),
+        },
+        cloudToken(),
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  let cloudPollTimer = null;
+  async function pollCloud() {
+    if (
+      !CLOUD_API_BASE ||
+      !cloudReady ||
+      !cloudToken() ||
+      document.visibilityState !== "visible"
+    ) {
+      return;
+    }
+    try {
+      const [remote, notifications] = await Promise.all([
+        cloudRequest("/workspace"),
+        cloudRequest(
+          `/notifications?since=${Number(
+            localStorage.getItem(CLOUD_NOTIFICATION_CURSOR_KEY) || 0,
+          )}`,
+        ),
+      ]);
+      if (Number(remote.revision) > cloudRevision) {
+        cloudRevision = Number(remote.revision);
+        localStorage.setItem(CLOUD_REVISION_KEY, String(cloudRevision));
+        applyCloudWorkspace(remote.state, currentCloudUser(), true);
+        showToast("已同步其他设备的云端更新");
+      }
+      for (const notification of notifications.items || []) {
+        notifyDevice(
+          notification.title,
+          notification.body,
+          `cloud-${notification.id}`,
+        );
+        localStorage.setItem(
+          CLOUD_NOTIFICATION_CURSOR_KEY,
+          String(notification.createdAt),
+        );
+      }
+    } catch (error) {
+      if (error.status === 401) handleCloudUnauthorized();
+    }
+  }
+
+  let activeCloudUser = null;
+  function currentCloudUser() {
+    if (activeCloudUser) return activeCloudUser;
+    const account = currentAccount();
+    return {
+      id: `usr_${account?.id || ""}`,
+      accountId: account?.id || "",
+      name: account?.name || "",
+      loginId: account?.loginId || "",
+      role: account?.role || "门店小伙伴",
+      storeId: account?.storeId || "",
+      status: account?.status || "启用",
+    };
+  }
+
+  function startCloudPolling() {
+    if (cloudPollTimer) return;
+    cloudPollTimer = window.setInterval(pollCloud, 15_000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") pollCloud();
+    });
+  }
+
   function applyAccountAccess(account) {
     const accountView = viewRoleByAccountRole[account.role] || "store";
     state.role = accountView;
@@ -6873,6 +7387,20 @@
     if (action === "logout") {
       state.authenticated = false;
       state.rolePreview = false;
+      activeCloudUser = null;
+      cloudReady = false;
+      localStorage.removeItem(CLOUD_TOKEN_KEY);
+      localStorage.removeItem(CLOUD_REVISION_KEY);
+      localStorage.removeItem(CLOUD_NOTIFICATION_CURSOR_KEY);
+      try {
+        nativeBridge?.clearCloudSession?.();
+      } catch {
+        // The web build has no native bridge.
+      }
+      if (cloudPollTimer) {
+        clearInterval(cloudPollTimer);
+        cloudPollTimer = null;
+      }
       saveState();
       closeModal();
       closeDrawer();
@@ -6977,6 +7505,10 @@
     if (action === "camera-zoom-step") {
       const step = Number(target.dataset.step || 0) * 0.2;
       applyCameraZoom(activeCameraZoom.value + step);
+      return;
+    }
+    if (action === "cycle-camera-lens") {
+      cycleCameraLens();
       return;
     }
     if (
@@ -7587,12 +8119,45 @@
     }
   });
 
-  document.addEventListener("submit", (event) => {
+  document.addEventListener("submit", async (event) => {
     if (event.target.id === "loginForm") {
       event.preventDefault();
       const data = new FormData(event.target);
       const loginId = String(data.get("loginId") || "").trim().toLowerCase();
       const pin = String(data.get("pin") || "").trim();
+      if (CLOUD_API_BASE) {
+        const submit = event.target.querySelector('[type="submit"]');
+        if (submit) {
+          submit.disabled = true;
+          submit.textContent = "正在登录云端…";
+        }
+        try {
+          const user = await loginWithCloud(loginId, pin);
+          if (launchPage) {
+            if (state.role === "store" && launchPage === "tasks") {
+              ui.mobileTab = "tasks";
+            } else if (state.role === "store" && launchPage === "issues") {
+              ui.mobileTab = "issues";
+            } else if (
+              ["overview", "tasks", "issues", "stores", "reports"].includes(
+                launchPage,
+              )
+            ) {
+              state.page = launchPage;
+            }
+          }
+          saveState({ skipCloud: true });
+          renderApp();
+          showToast(`已登录云端：${user.name} · ${user.role}`);
+        } catch (error) {
+          showToast(error.message || "云端登录失败", "error");
+          if (submit) {
+            submit.disabled = false;
+            submit.textContent = "登录";
+          }
+        }
+        return;
+      }
       const account = state.accounts.find(
         (item) =>
           String(item.loginId || "").toLowerCase() === loginId &&
@@ -7939,5 +8504,48 @@
     });
   }
 
+  window.XundianBack = () => {
+    try {
+      if (document.getElementById("camera-root")?.children.length) {
+        closeCameraCapture();
+        return true;
+      }
+      if (document.getElementById("modal-root")?.children.length) {
+        closeModal();
+        return true;
+      }
+      if (document.getElementById("drawer-root")?.children.length) {
+        closeDrawer();
+        return true;
+      }
+      if (state.role === "store" && ui.mobileTab !== "home") {
+        ui.mobileTab = "home";
+        renderApp();
+        return true;
+      }
+      if (state.rolePreview) {
+        state.role = "hq";
+        state.rolePreview = false;
+        state.page = "overview";
+        ui.mobileTab = "home";
+        saveState();
+        renderApp();
+        return true;
+      }
+      if (state.page && state.page !== "overview" && state.role !== "store") {
+        state.page = "overview";
+        saveState();
+        renderApp();
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
   renderApp();
+  if (CLOUD_API_BASE && cloudToken()) {
+    restoreCloudSession().catch(() => {});
+  }
 })();

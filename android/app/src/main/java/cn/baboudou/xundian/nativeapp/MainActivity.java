@@ -31,6 +31,7 @@ public class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> pendingFileCallback;
     private PermissionRequest pendingCameraRequest;
+    private long lastRootBackAt = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -183,6 +184,28 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void setCloudSession(String apiBase, String token) {
+            if (apiBase == null || token == null || apiBase.isEmpty()) return;
+            getSharedPreferences("xundian_cloud", MODE_PRIVATE)
+                .edit()
+                .putString("apiBase", apiBase)
+                .putString("token", token)
+                .apply();
+            CloudSyncWorker.configure(MainActivity.this);
+        }
+
+        @JavascriptInterface
+        public void clearCloudSession() {
+            getSharedPreferences("xundian_cloud", MODE_PRIVATE)
+                .edit()
+                .remove("apiBase")
+                .remove("token")
+                .remove("lastNotificationAt")
+                .apply();
+            CloudSyncWorker.clear(MainActivity.this);
+        }
+
+        @JavascriptInterface
         public void requestNotifications() {
             runOnUiThread(MainActivity.this::requestNotificationPermission);
         }
@@ -309,11 +332,31 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
+        if (webView == null) {
             super.onBackPressed();
+            return;
         }
+        webView.evaluateJavascript(
+            "window.XundianBack ? window.XundianBack() : false",
+            value -> {
+                if ("true".equals(value)) return;
+                if (webView.canGoBack()) {
+                    webView.goBack();
+                    return;
+                }
+                long now = System.currentTimeMillis();
+                if (now - lastRootBackAt <= 2000) {
+                    finish();
+                    return;
+                }
+                lastRootBackAt = now;
+                Toast.makeText(
+                    MainActivity.this,
+                    "再返回一次退出应用",
+                    Toast.LENGTH_SHORT
+                ).show();
+            }
+        );
     }
 
     @Override

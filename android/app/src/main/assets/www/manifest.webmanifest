@@ -2,7 +2,7 @@
   "name": "巡店云 · 巴布豆门店运营",
   "short_name": "巡店云",
   "id": "https://huangqing631.github.io/xundian-cloud/",
-  "description": "巴布豆商丘区域 10 家门店的总经理、督导与门店三端协同应用",
+  "description": "巴布豆商丘区域 10 家门店的区域经理、督导与门店小伙伴协同应用",
   "start_url": "https://huangqing631.github.io/xundian-cloud/",
   "scope": "https://huangqing631.github.io/xundian-cloud/",
   "display": "standalone",
@@ -47,7 +47,7 @@
       "sizes": "1440x1000",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "总经理经营看板"
+      "label": "区域经理经营看板"
     }
   ],
   "shortcuts": [
