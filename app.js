@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.15";
+  const APP_VERSION = "2026.11.25.16";
 
   const iconPaths = {
     home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
@@ -1469,6 +1469,10 @@
   const isNativeApp =
     launchParams.get("native") === "1" ||
     Boolean(nativeBridge?.isNativeApp?.());
+  const NATIVE_APP_VERSION = nativeBridge?.getAppVersion?.() || "";
+  const RELEASE_FEED_URL = isNativeApp
+    ? "https://huangqing631.github.io/xundian-cloud/version.json"
+    : "./version.json";
   if (isNativeApp) {
     document.documentElement.classList.add("native-app");
   }
@@ -3833,7 +3837,7 @@
               <button class="insight-item" data-action="navigate" data-page="store-settings"><span class="insight-number">1</span><p><strong>门店设置</strong><br>营业时间、状态与门店资料</p></button>
               <button class="insight-item" data-action="navigate" data-page="accounts"><span class="insight-number">2</span><p><strong>人员账号设置</strong><br>总部、督导、门店人员与门店绑定</p></button>
               <button class="insight-item" data-action="check-update"><span class="insight-number">3</span><p><strong>应用更新中心</strong><br>检测新版本并让在线用户自动刷新</p></button>
-              ${isNativeApp ? "" : `<a class="insight-item" href="./xundian-cloud-native.apk" download><span class="insight-number">4</span><p><strong>Android 原生安装包</strong><br>本地内置应用资源，不再依赖 Chrome 或跳出浏览器</p></a>`}
+              ${isNativeApp ? `<button class="insight-item" data-action="native-update"><span class="insight-number">4</span><p><strong>下载原生版更新</strong><br>发现新版本后会发系统通知，也可在这里主动下载</p></button>` : `<a class="insight-item" href="./xundian-cloud-native.apk" download><span class="insight-number">4</span><p><strong>Android 原生安装包</strong><br>本地内置应用资源，不再依赖 Chrome 或跳出浏览器</p></a>`}
             </div>
           </section>
         </div>
@@ -4799,11 +4803,41 @@
     if (updateCheckInFlight) return;
     updateCheckInFlight = true;
     try {
-      const response = await fetch(`./version.json?t=${Date.now()}`, {
+      const response = await fetch(`${RELEASE_FEED_URL}?t=${Date.now()}`, {
         cache: "no-store",
       });
       const release = await response.json();
-      if (release.version && release.version !== APP_VERSION) {
+      if (
+        isNativeApp &&
+        release.nativeVersion &&
+        release.nativeVersion !== NATIVE_APP_VERSION
+      ) {
+        localStorage.setItem(
+          "xundian-last-native-release",
+          JSON.stringify(release),
+        );
+        const notifiedVersion = localStorage.getItem(
+          "xundian-native-update-notified",
+        );
+        if (notifiedVersion !== release.nativeVersion) {
+          notifyDevice(
+            "巡店云有新版本",
+            `原生版 ${release.nativeVersion} 已发布，请到管理中心下载更新。`,
+            `app-update-${release.nativeVersion}`,
+          );
+          localStorage.setItem(
+            "xundian-native-update-notified",
+            release.nativeVersion,
+          );
+        }
+        if (manual) {
+          showToast(
+            `发现原生版 ${release.nativeVersion}，可在管理中心下载更新`,
+          );
+        }
+        return;
+      }
+      if (!isNativeApp && release.version && release.version !== APP_VERSION) {
         showToast(`发现新版本 ${release.version}，正在自动更新`);
         localStorage.setItem(
           "xundian-last-release",
@@ -4816,7 +4850,11 @@
         return;
       }
       if (manual) {
-        showToast(`当前已是最新版本 ${APP_VERSION}`);
+        showToast(
+          `当前已是最新版本 ${
+            isNativeApp ? NATIVE_APP_VERSION || APP_VERSION : APP_VERSION
+          }`,
+        );
       }
     } catch {
       if (manual) {
@@ -6945,6 +6983,23 @@
     }
     if (action === "check-update") {
       checkForAppUpdate(true);
+      return;
+    }
+    if (action === "native-update") {
+      let downloadUrl =
+        "https://huangqing631.github.io/xundian-cloud/xundian-cloud-native.apk";
+      try {
+        const release = JSON.parse(
+          localStorage.getItem("xundian-last-native-release") || "{}",
+        );
+        if (release.downloadUrl) downloadUrl = release.downloadUrl;
+      } catch {
+        // Use the stable download address when release metadata is unavailable.
+      }
+      showToast("正在打开原生版下载页面");
+      window.setTimeout(() => {
+        window.location.href = downloadUrl;
+      }, 180);
       return;
     }
     if (action === "notifications") {
