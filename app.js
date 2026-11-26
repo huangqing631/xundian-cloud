@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.26.41";
+  const APP_VERSION = "2026.11.26.42";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -12,6 +12,7 @@
   const CLOUD_REVISION_KEY = "xundian-cloud-revision";
   const CLOUD_NOTIFICATION_CURSOR_KEY = "xundian-cloud-notification-cursor";
   const LAUNCHER_BADGE_KEY = "xundian-actionable-badge-count";
+  const LEARNING_PROGRESS_KEY = "xundian-learning-progress:v1";
   let cloudReady = false;
   let cloudRevision = Number(localStorage.getItem(CLOUD_REVISION_KEY) || 0);
   let cloudSyncTimer = null;
@@ -1711,6 +1712,7 @@
       ...task,
       inspector:
         task.inspector === "门店人员" ? "门店小伙伴" : task.inspector,
+      inspectorAccountId: String(task.inspectorAccountId || ""),
       taskType:
         task.taskType || (task.templateId ? "inspection" : "operation"),
       assigneeRole:
@@ -1737,52 +1739,13 @@
           ? "门店小伙伴"
           : normalizeAccountRole(issue.assignee),
     }));
-    const defaultAccounts = [
-      {
-        id: "ACC-HQ-001",
-        name: "黄庆",
-        phone: "区域经理主账号",
-        role: "区域经理",
-        store: "全区域",
-        storeId: "",
-        status: "启用",
-        loginId: "admin",
-        pin: "888888",
-      },
-      {
-        id: "ACC-SUP-001",
-        name: "王宁",
-        phone: "138****2016",
-        role: "督导",
-        store: "商丘区域",
-        storeId: "",
-        status: "启用",
-        loginId: "supervisor",
-        pin: "666666",
-      },
-      {
-        id: "ACC-STORE-001",
-        name: "张晓雨",
-        phone: "139****0821",
-        role: "门店小伙伴",
-        store: "巴布豆商丘华夏路店",
-        storeId: "st2",
-        status: "启用",
-        loginId: "store",
-        pin: "111111",
-      },
-    ];
-    const sourceAccounts = target.accounts?.length
+    const sourceAccounts = Array.isArray(target.accounts)
       ? target.accounts
-      : defaultAccounts;
+      : [];
     const usedLoginIds = new Set();
     target.accounts = sourceAccounts.map((account, index) => {
       const role = normalizeAccountRole(account.role);
-      const fallback =
-        defaultAccounts.find((item) => item.role === role) ||
-        defaultAccounts[index] ||
-        defaultAccounts[0];
-      let loginId = String(account.loginId || fallback.loginId || "user")
+      let loginId = String(account.loginId || `user${index + 1}`)
         .trim()
         .toLowerCase();
       if (!loginId) loginId = `user${index + 1}`;
@@ -1803,7 +1766,7 @@
         loginId,
         pin: account.cloudManaged
           ? String(account.pin || "")
-          : String(account.pin || fallback.pin || "123456"),
+          : String(account.pin || ""),
         cloudManaged: Boolean(account.cloudManaged),
         status: account.status || "启用",
       };
@@ -1823,7 +1786,16 @@
   }
 
   let state = normalizeAppState(loadState());
-  let learningProgress = [];
+  let learningProgress = (() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem(LEARNING_PROGRESS_KEY) || "[]",
+      );
+      return Array.isArray(saved) ? saved : [];
+    } catch {
+      return [];
+    }
+  })();
   let learningLoaded = false;
   const ui = {
     taskFilter: "all",
@@ -2464,7 +2436,7 @@
             <div class="camera-watermark-preview">
               <span>巡店现场</span>
               <strong>${escapeHtml(store.name)}</strong>
-              <small>督导：黄庆 · 自动添加时间与地点水印</small>
+              <small>督导：${escapeHtml(currentActorName("当前账号"))} · 自动添加时间与地点水印</small>
             </div>
             <div class="camera-guide"></div>
           </div>
@@ -2745,7 +2717,7 @@
     context.fillText(store.name, baseFont * 1.4, height - barHeight + baseFont * 1.45);
     context.font = `500 ${baseFont}px "Microsoft YaHei", sans-serif`;
     context.fillText(
-      `督导现场 · 黄庆 · ${timeText}`,
+      `督导现场 · ${currentActorName("当前账号")} · ${timeText}`,
       baseFont * 1.4,
       height - barHeight + baseFont * 2.75,
     );
@@ -2913,6 +2885,62 @@
     return totalUnits
       ? Math.round((completedUnits / totalUnits) * 100)
       : 0;
+  }
+
+  function getInspectionMissing(taskId) {
+    const task = taskById(taskId);
+    if (!task) return [];
+    const template = templateById(task.templateId);
+    const draft = getDraft(taskId);
+    const missing = [];
+
+    getTemplateItems(template).forEach((item) => {
+      const rating = draft.ratings[item.id];
+      if (!rating) {
+        missing.push({
+          categoryId: item.categoryId,
+          label: `“${item.title}”尚未判定`,
+        });
+        return;
+      }
+      if (rating === "fail") {
+        if (!isPhotoReady(draft.itemPhotos?.[item.id])) {
+          missing.push({
+            categoryId: item.categoryId,
+            label: `“${item.title}”缺少不符合项照片`,
+          });
+        }
+        if (!String(draft.notes?.[item.id] || "").trim()) {
+          missing.push({
+            categoryId: item.categoryId,
+            label: `“${item.title}”缺少问题反馈`,
+          });
+        }
+      }
+    });
+
+    template.categories.forEach((category) => {
+      const photos = draft.categoryPhotos?.[category.id] || [];
+      const required = category.photoCount || 0;
+      const ready = Array.from(
+        { length: required },
+        (_, index) => photos[index],
+      ).filter(isPhotoReady).length;
+      if (ready < required) {
+        missing.push({
+          categoryId: category.id,
+          label: `“${category.name}”大项照片还差 ${required - ready} 张`,
+        });
+      }
+      if (!String(draft.categoryFeedback?.[category.id] || "").trim()) {
+        missing.push({
+          categoryId: category.id,
+          label: `“${category.name}”大项反馈未填写`,
+        });
+      }
+    });
+
+    return missing;
   }
 
   function pendingIssueCount() {
@@ -3859,7 +3887,7 @@
             ["pending", "urgent"].includes(task.status)) ||
           task.status === ui.taskFilter;
         const query = ui.taskQuery.trim().toLowerCase();
-        const text = `${task.title} ${store?.name || "商丘区域"} ${task.inspector}`.toLowerCase();
+        const text = `${task.title} ${store?.name || "商丘区域"} ${taskInspectorName(task)}`.toLowerCase();
         return assigneeMatch && statusMatch && (!query || text.includes(query));
       }),
     );
@@ -4028,8 +4056,8 @@
                 </div>
                 <div class="task-card-bottom">
                   <div class="assignee">
-                    ${renderAvatar(task.inspector, "avatar-blue")}
-                    ${escapeHtml(task.inspector)} · ${escapeHtml(
+                    ${renderAvatar(taskInspectorName(task), "avatar-blue")}
+                    ${escapeHtml(taskInspectorName(task))} · ${escapeHtml(
                       taskTypeLabel(task),
                     )} · ${escapeHtml(task.createdBy || "系统")}下发
                   </div>
@@ -4635,7 +4663,7 @@
                               task.title,
                             )}</strong><span>${escapeHtml(
                               store?.name || "督导任务",
-                            )} · ${escapeHtml(task.inspector)}</span></span>
+                            )} · ${escapeHtml(taskInspectorName(task))}</span></span>
                             <button class="button button-primary button-sm" data-action="review-task" data-task-id="${
                               task.id
                             }">审核</button>
@@ -5409,7 +5437,7 @@
                           task.title,
                         )}</strong><span>${escapeHtml(
                           task.completedAt || task.dueLabel,
-                        )} · ${escapeHtml(task.inspector)}</span></span>
+                        )} · ${escapeHtml(taskInspectorName(task))}</span></span>
                         ${icon("chevron", "icon-sm")}
                       </div>
                     `,
@@ -5706,6 +5734,40 @@
     return state.accounts.find(
       (account) => account.id === state.currentAccountId,
     );
+  }
+
+  function currentActorName(fallback = "当前账号") {
+    return String(currentAccount()?.name || fallback).trim();
+  }
+
+  function taskInspectorName(task) {
+    const account = state.accounts.find(
+      (item) => item.id === task?.inspectorAccountId,
+    );
+    return String(account?.name || task?.inspector || "待督导领取").trim();
+  }
+
+  function dateIso(date = new Date()) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
+    const value = Object.fromEntries(
+      parts
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value]),
+    );
+    return `${value.year}-${value.month}-${value.day}`;
+  }
+
+  function currentDateIso() {
+    return dateIso(new Date());
+  }
+
+  function dateIsoOffset(days) {
+    return dateIso(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
   }
 
   function cloudToken() {
@@ -6159,6 +6221,7 @@
           <form id="loginForm" class="login-form">
             <label>登录账号<input class="form-control" name="loginId" autocomplete="username" autocapitalize="none" required placeholder="请输入账号" /></label>
             <label>登录密码<input class="form-control" name="pin" type="password" inputmode="numeric" autocomplete="current-password" required placeholder="请输入密码" /></label>
+            <div id="loginError" class="form-error" role="alert" hidden></div>
             <button class="button button-primary login-submit" type="submit">${icon("arrow-right", "icon-sm")} 登录</button>
           </form>
           <button class="login-register-button" type="button" data-action="show-registration">申请注册</button>
@@ -6167,6 +6230,13 @@
       </div>
     `;
     root.setAttribute("aria-busy", "false");
+  }
+
+  function setLoginError(message = "") {
+    const target = document.getElementById("loginError");
+    if (!target) return;
+    target.textContent = message;
+    target.hidden = !message;
   }
 
   function renderRegistrationScreen() {
@@ -6188,7 +6258,7 @@
                   `<option value="${store.id}">${escapeHtml(store.name)}</option>`,
               )
               .join("")}</select></label>
-            <label>申请说明<textarea class="form-control" name="reason" rows="3" placeholder="可填写岗位、负责区域或加入原因"></textarea></label>
+            <label>申请说明<textarea class="form-control" name="reason" rows="3" maxlength="500" placeholder="可填写岗位、负责区域或加入原因"></textarea></label>
             <button class="button button-primary login-submit" type="submit">提交申请</button>
           </form>
           <button class="login-register-button" type="button" data-action="back-to-login">返回登录</button>
@@ -6513,7 +6583,7 @@
       toast.style.opacity = "0";
       toast.style.transform = "translateY(-8px)";
       window.setTimeout(() => toast.remove(), 220);
-    }, 2800);
+    }, type === "error" ? 6000 : 3000);
   }
 
   function closeModal(forceClose = false) {
@@ -6544,7 +6614,7 @@
     if (!ui.routeDraft.length) {
       return `<div class="empty-state" style="min-height:280px"><div class="empty-icon">${icon(
         "route",
-      )}</div><strong>还没有选择巡店门店</strong><p>从左侧勾选门店，再调整到访顺序。</p></div>`;
+      )}</div><strong>还没有选择巡店门店</strong><p>从门店列表勾选门店，再调整到访顺序。</p></div>`;
     }
     return ui.routeDraft
       .map((storeId, index) => {
@@ -6592,7 +6662,7 @@
   function renderRoutePlannerModal() {
     document.getElementById("modal-root").innerHTML = `
       <div class="modal-backdrop">
-        <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="routePlanTitle">
+        <div class="modal modal-wide route-planner-modal" role="dialog" aria-modal="true" aria-labelledby="routePlanTitle">
           <div class="modal-header">
             <div><div class="eyebrow">督导自主规划</div><h2 id="routePlanTitle">今日巡店路线</h2><p>选择计划到访的门店，并按实际出行顺序排列。</p></div>
             <button class="close-button" data-action="close-modal">${icon("x")}</button>
@@ -6690,7 +6760,7 @@
                 </div>
                 <div class="form-field">
                   <label for="visitDate">巡店日期</label>
-                  <input class="form-control" id="visitDate" name="date" type="date" value="2026-11-25" required />
+                  <input class="form-control" id="visitDate" name="date" type="date" value="${currentDateIso()}" required />
                 </div>
                 <div class="form-field">
                   <label for="visitTime">到店时间</label>
@@ -6699,14 +6769,18 @@
                 <div class="form-field full">
                   <label>执行督导</label>
                   <div class="inspection-store-strip" style="margin-bottom:0">
-                    ${renderAvatar("黄庆", "avatar-green")}
-                    <span><strong>黄庆</strong><span>商丘区域督导 · 当前账号</span></span>
+                    ${renderAvatar(currentActorName("督导"), "avatar-green")}
+                    <span><strong>${escapeHtml(
+                      currentActorName("当前账号"),
+                    )}</strong><span>${escapeHtml(
+                      currentAccount()?.role || "督导",
+                    )} · 当前账号</span></span>
                     <span class="badge info">现场发起</span>
                   </div>
                 </div>
                 <div class="form-field full">
                   <label for="visitNote">本次巡店备注</label>
-                  <textarea class="form-control" id="visitNote" name="note" placeholder="可填写本次重点关注事项，例如：复查上次整改、检查新品陈列…"></textarea>
+                  <textarea class="form-control" id="visitNote" name="note" maxlength="1000" placeholder="可填写本次重点关注事项，例如：复查上次整改、检查新品陈列…"></textarea>
                 </div>
               </div>
             </div>
@@ -6786,7 +6860,9 @@
                 <div class="form-field"><label>营业时间</label><input class="form-control" name="businessHours" value="10:00–22:00" /></div>
                 <div class="form-field"><label>门店联系人</label><input class="form-control" name="contact" value="门店小伙伴" /></div>
                 <div class="form-field"><label>门店电话</label><input class="form-control" name="phone" placeholder="选填" /></div>
-                <div class="form-field"><label>督导</label><input class="form-control" name="inspector" value="黄庆" /></div>
+                <div class="form-field"><label>督导</label><input class="form-control" name="inspector" value="${escapeHtml(
+                  currentActorName("督导"),
+                )}" /></div>
                 <div class="form-field full"><label>门店地址</label><input class="form-control" name="address" required placeholder="填写商场、楼层或街道地址" /></div>
               </div>
             </div>
@@ -6977,15 +7053,30 @@
     return learningProgress.find((item) => item.lessonId === lessonId);
   }
 
+  function saveLocalLearningProgress(item) {
+    const index = learningProgress.findIndex(
+      (entry) => entry.lessonId === item.lessonId,
+    );
+    if (index >= 0) learningProgress[index] = item;
+    else learningProgress.push(item);
+    localStorage.setItem(
+      LEARNING_PROGRESS_KEY,
+      JSON.stringify(learningProgress),
+    );
+  }
+
   async function loadLearningProgress(shouldRender = true) {
     if (!CLOUD_API_BASE || !cloudToken()) {
-      learningProgress = [];
       learningLoaded = true;
       return;
     }
     try {
       const result = await cloudRequest("/learning/progress");
       learningProgress = result.items || [];
+      localStorage.setItem(
+        LEARNING_PROGRESS_KEY,
+        JSON.stringify(learningProgress),
+      );
       learningLoaded = true;
       if (
         shouldRender &&
@@ -7007,8 +7098,18 @@
     attempts = 0,
   }) {
     if (!CLOUD_API_BASE || !cloudToken()) {
-      showToast("当前离线，学习进度暂不能保存", "error");
-      return null;
+      const item = {
+        lessonId,
+        status,
+        score,
+        answers,
+        attempts,
+        updatedAt: new Date().toISOString(),
+        pendingSync: true,
+      };
+      saveLocalLearningProgress(item);
+      learningLoaded = true;
+      return item;
     }
     try {
       const result = await cloudRequest("/learning/progress", {
@@ -7026,11 +7127,84 @@
       );
       if (index >= 0) learningProgress[index] = result.item;
       else learningProgress.push(result.item);
+      localStorage.setItem(
+        LEARNING_PROGRESS_KEY,
+        JSON.stringify(learningProgress),
+      );
       return result.item;
     } catch (error) {
-      showToast(error.message || "学习进度保存失败", "error");
-      return null;
+      const item = {
+        lessonId,
+        status,
+        score,
+        answers,
+        attempts,
+        updatedAt: new Date().toISOString(),
+        pendingSync: true,
+      };
+      saveLocalLearningProgress(item);
+      showToast(
+        `${error.message || "学习进度云端保存失败"}，已暂存在本机`,
+        "error",
+      );
+      return item;
     }
+  }
+
+  function openExamResult({ score, answers }) {
+    const passed = score >= 80;
+    const correct = learningExamQuestions.filter(
+      (question, index) => answers[index] === question.answer,
+    ).length;
+    document.getElementById("modal-root").innerHTML = `
+      <div class="modal-backdrop">
+        <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="examResultTitle">
+          <div class="modal-header">
+            <div>
+              <div class="eyebrow">考试结果</div>
+              <h2 id="examResultTitle">${passed ? "考试通过" : "本次未通过"}</h2>
+              <p>答对 ${correct}/${learningExamQuestions.length} 题，及格线 80 分。</p>
+            </div>
+            <button class="close-button" data-action="close-modal" aria-label="关闭">${icon("x")}</button>
+          </div>
+          <div class="modal-body">
+            <div class="inspection-summary" style="background:linear-gradient(125deg,#202832,#2d3a46)">
+              <h3>${passed ? "已达标" : "请复习后再次考试"}</h3>
+              <div class="inspection-summary-grid">
+                <div><strong>${score}</strong><span>本次得分</span></div>
+                <div><strong>${correct}</strong><span>答对题数</span></div>
+                <div><strong>${learningExamQuestions.length}</strong><span>总题数</span></div>
+              </div>
+            </div>
+            <div class="exam-question-list" style="margin-top:18px">
+              ${learningExamQuestions
+                .map((question, index) => {
+                  const selected = question.options[answers[index]];
+                  const answer = question.options[question.answer];
+                  const isCorrect = answers[index] === question.answer;
+                  return `
+                    <section class="exam-question">
+                      <div class="check-item-head">
+                        <span class="badge ${isCorrect ? "success" : "urgent"}">${isCorrect ? "正确" : "错误"}</span>
+                        <span class="check-copy"><strong>${index + 1}. ${escapeHtml(
+                          question.question,
+                        )}</strong><span>你的答案：${escapeHtml(
+                          selected || "未作答",
+                        )}${isCorrect ? "" : ` · 正确答案：${escapeHtml(answer)}`}</span></span>
+                      </div>
+                    </section>
+                  `;
+                })
+                .join("")}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <span class="footer-info">${passed ? "成绩已保存" : "本次成绩已保存，可重新学习后再考"}</span>
+            <button class="button button-primary" data-action="close-modal">完成</button>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   function openLearningCourse(courseId) {
@@ -7158,7 +7332,7 @@
                         ? Math.round((planCompleted / planCourses.length) * 100)
                         : 0
                     }%"></span></div>
-                    <div class="learning-plan-meta"><span>${planCompleted}/${planCourses.length} 已完成</span><button class="button button-secondary button-sm" data-action="start-learning-plan" data-plan-id="${plan.id}">${planCompleted ? "继续学习" : "开始规划"}</button></div>
+                    <div class="learning-plan-meta"><span>${planCompleted}/${planCourses.length} 已完成</span><button class="button button-secondary button-sm" data-action="start-learning-plan" data-plan-id="${plan.id}">${planCompleted ? "继续学习" : "开始学习"}</button></div>
                   </article>
                 `;
               })
@@ -7231,10 +7405,10 @@
                       `<option value="${store.id}">${escapeHtml(store.name)}</option>`,
                   )
                   .join("")}</select></div>
-                <div class="form-field full"><label>任务标题</label><input class="form-control" name="title" required placeholder="例如：复查消防通道整改情况" /></div>
+                <div class="form-field full"><label>任务标题</label><input class="form-control" name="title" maxlength="80" required placeholder="例如：复查消防通道整改情况" /></div>
                 <div class="form-field"><label>任务优先级</label><select class="form-control" name="priority"><option>普通</option><option>重要</option><option>紧急</option></select></div>
-                <div class="form-field"><label>完成期限</label><input class="form-control" type="date" name="due" value="2026-11-28" required /></div>
-                <div class="form-field full"><label>任务说明</label><textarea class="form-control" name="description" placeholder="说明任务背景、完成要求和审核标准"></textarea></div>
+                <div class="form-field"><label>完成期限</label><input class="form-control" type="date" name="due" value="${dateIsoOffset(2)}" required /></div>
+                <div class="form-field full"><label>任务说明</label><textarea class="form-control" name="description" maxlength="2000" placeholder="说明任务背景、完成要求和审核标准"></textarea></div>
                 <div class="form-field full">
                   <label>任务说明图片</label>
                   <div class="assignment-photo-list" id="assignmentPhotoList"></div>
@@ -7288,7 +7462,7 @@
                 <label>完成反馈<em>*</em></label>
                 <textarea class="form-control" name="completionNote" data-task-completion-note data-task-id="${
                   task.id
-                }" placeholder="说明完成情况、结果或需要上级关注的问题">${escapeHtml(
+                }" maxlength="1000" placeholder="说明完成情况、结果或需要上级关注的问题">${escapeHtml(
                   task.completionNote || "",
                 )}</textarea>
               </div>
@@ -7324,7 +7498,7 @@
               task.title,
             )}</h2><p>${escapeHtml(store?.name || "商丘区域")} · ${escapeHtml(
               taskTypeLabel(task),
-            )} · 执行人 ${escapeHtml(task.inspector)}</p></div>
+            )} · 执行人 ${escapeHtml(taskInspectorName(task))}</p></div>
             <button class="close-button" data-action="close-modal">${icon("x")}</button>
           </div>
           <div class="modal-body">
@@ -7425,12 +7599,25 @@
                 </div>
                 <div class="form-field">
                   <label for="taskDate">计划日期<em>*</em></label>
-                  <input class="form-control" id="taskDate" name="date" type="date" value="2026-11-26" required />
+                  <input class="form-control" id="taskDate" name="date" type="date" value="${currentDateIso()}" required />
                 </div>
                 <div class="form-field">
                   <label for="taskInspector">执行督导</label>
                   <select class="form-control" id="taskInspector" name="inspector">
-                    <option>黄庆</option>
+                    ${
+                      state.accounts
+                        .filter((account) => account.role === "督导")
+                        .map(
+                          (account) =>
+                            `<option value="${escapeHtml(
+                              account.id,
+                            )}">${escapeHtml(account.name)}</option>`,
+                        )
+                        .join("") ||
+                      `<option value="${escapeHtml(
+                        currentAccount()?.id || "",
+                      )}">${escapeHtml(currentActorName("督导"))}</option>`
+                    }
                   </select>
                 </div>
                 <div class="form-field">
@@ -7446,7 +7633,7 @@
                 </div>
                 <div class="form-field full">
                   <label for="taskNote">任务说明</label>
-                  <textarea class="form-control" id="taskNote" name="note" placeholder="补充本次巡店的重点，例如：复查上月消防通道问题…"></textarea>
+                  <textarea class="form-control" id="taskNote" name="note" maxlength="1000" placeholder="补充本次巡店的重点，例如：复查上月消防通道问题…"></textarea>
                   <div class="form-hint">任务将通知执行人员，检查清单可在执行时继续调整。</div>
                 </div>
               </div>
@@ -7518,7 +7705,7 @@
                 </div>
                 <div class="form-field full">
                   <label for="issueDescription">详细说明</label>
-                  <textarea class="form-control" id="issueDescription" name="description" placeholder="补充问题位置、影响与现场处理建议…"></textarea>
+                  <textarea class="form-control" id="issueDescription" name="description" maxlength="2000" placeholder="补充问题位置、影响与现场处理建议…"></textarea>
                 </div>
                 <div class="form-field full">
                   <button type="button" class="button button-secondary button-block" data-action="mock-photo">
@@ -7603,6 +7790,14 @@
     if (!task || task.status === "completed") {
       openInspectionReport(taskId);
       return;
+    }
+    if (state.role === "supervisor" && currentAccount()) {
+      task.inspector = currentActorName("督导");
+      task.inspectorAccountId = currentAccount().id;
+      if (["pending", "urgent"].includes(task.status)) {
+        task.status = "in_progress";
+      }
+      saveState();
     }
     const store = storeById(task.storeId);
     const template = templateById(task.templateId);
@@ -7812,7 +8007,7 @@
                                       </div>
                                       <textarea class="check-note check-note-fail" data-note-item="${
                                         item.id
-                                      }" data-task-id="${
+                                      }" maxlength="500" data-task-id="${
                                         task.id
                                       }" placeholder="填写问题与整改反馈（必填）">${escapeHtml(
                                         draft.notes?.[item.id] || "",
@@ -7863,7 +8058,7 @@
                         </div>
                         <textarea class="check-note category-feedback-input" data-category-feedback="${
                           category.id
-                        }" data-task-id="${
+                        }" maxlength="1000" data-task-id="${
                           task.id
                         }" placeholder="请概括本大项整体情况、亮点或后续建议">${escapeHtml(
                           draft.categoryFeedback?.[category.id] || "",
@@ -7908,9 +8103,9 @@
                   } 项`
             }</span>
             <button class="button button-secondary" data-action="save-draft" data-task-id="${task.id}">保存草稿</button>
-            <button class="button button-primary" data-action="submit-inspection" data-task-id="${task.id}" ${
-              progress < 100 ? "disabled style='opacity:.5;cursor:not-allowed'" : ""
-            }>提交巡检</button>
+            <button class="button button-primary" data-action="submit-inspection" data-task-id="${task.id}">${
+              progress < 100 ? "检查并定位缺项" : "提交巡检"
+            }</button>
           </div>
         </div>
       </div>
@@ -7980,9 +8175,10 @@
     if (sideBar) sideBar.style.width = `${progress}%`;
     const submit = document.querySelector('[data-action="submit-inspection"]');
     if (submit) {
-      submit.disabled = progress < 100;
-      submit.style.opacity = progress < 100 ? ".5" : "1";
-      submit.style.cursor = progress < 100 ? "not-allowed" : "pointer";
+      submit.disabled = false;
+      submit.style.opacity = "1";
+      submit.style.cursor = "pointer";
+      submit.textContent = progress < 100 ? "检查并定位缺项" : "提交巡检";
     }
     const hint = document.querySelector("#inspectionHint");
     if (hint) {
@@ -8050,7 +8246,7 @@
                 task.title,
               )}</h2>
               <p>${escapeHtml(template.name)} · ${escapeHtml(
-                task.inspector,
+                taskInspectorName(task),
               )} · ${escapeHtml(task.completedAt || task.dueLabel)}</p>
             </div>
             <button class="close-button" data-action="close-modal" aria-label="关闭">${icon("x")}</button>
@@ -8239,6 +8435,66 @@
     `;
   }
 
+  function openRejectIssueModal(issueId) {
+    const issue = issueById(issueId);
+    if (!issue) return;
+    document.getElementById("modal-root").innerHTML = `
+      <div class="modal-backdrop">
+        <form id="rejectIssueForm" class="modal" data-issue-id="${issue.id}" role="dialog" aria-modal="true" aria-labelledby="rejectIssueTitle">
+          <div class="modal-header">
+            <div>
+              <div class="eyebrow">整改复核</div>
+              <h2 id="rejectIssueTitle">驳回整改</h2>
+              <p>${escapeHtml(issue.title)}</p>
+            </div>
+            <button class="close-button" data-action="close-modal" type="button" aria-label="关闭">${icon("x")}</button>
+          </div>
+          <div class="modal-body">
+            <label class="form-field">
+              <span>驳回原因<em>*</em></span>
+              <textarea class="form-control" name="reason" rows="4" maxlength="500" required placeholder="请说明凭证问题或仍需整改的内容，门店会收到该原因。"></textarea>
+            </label>
+          </div>
+          <div class="modal-footer">
+            <span class="footer-info">驳回后门店可重新提交整改凭证</span>
+            <button class="button button-secondary" data-action="close-modal" type="button">取消</button>
+            <button class="button button-danger" type="submit">确认驳回</button>
+          </div>
+        </form>
+      </div>
+    `;
+  }
+
+  function openResetAccountPinModal(accountId) {
+    const account = state.accounts.find((item) => item.id === accountId);
+    if (!account) return;
+    document.getElementById("modal-root").innerHTML = `
+      <div class="modal-backdrop">
+        <form id="resetAccountPinForm" class="modal" data-account-id="${account.id}" role="dialog" aria-modal="true" aria-labelledby="resetPinTitle">
+          <div class="modal-header">
+            <div>
+              <div class="eyebrow">账号安全</div>
+              <h2 id="resetPinTitle">重置登录密码</h2>
+              <p>${escapeHtml(account.name)} · ${escapeHtml(account.role)}</p>
+            </div>
+            <button class="close-button" data-action="close-modal" type="button" aria-label="关闭">${icon("x")}</button>
+          </div>
+          <div class="modal-body">
+            <label class="form-field">
+              <span>新密码<em>*</em></span>
+              <input class="form-control" name="pin" type="password" minlength="6" maxlength="32" autocomplete="new-password" required placeholder="至少 6 位" />
+            </label>
+          </div>
+          <div class="modal-footer">
+            <span class="footer-info">重置后请将新密码安全告知账号使用人</span>
+            <button class="button button-secondary" data-action="close-modal" type="button">取消</button>
+            <button class="button button-primary" type="submit">确认重置</button>
+          </div>
+        </form>
+      </div>
+    `;
+  }
+
   function openStoreDrawer(storeId) {
     const store = storeById(storeId);
     if (!store) return;
@@ -8320,7 +8576,7 @@
                         : statusMeta(task.status).label
                     }</p><span>${escapeHtml(
                       task.completedAt || task.dueLabel,
-                    )} · ${escapeHtml(task.inspector)}</span></div>
+                    )} · ${escapeHtml(taskInspectorName(task))}</span></div>
                   `,
                 )
                 .join("")}
@@ -8344,59 +8600,38 @@
     const template = templateById(task.templateId);
     const items = getTemplateItems(template);
     const draft = getDraft(taskId);
-    if (items.some((item) => !draft.ratings[item.id])) {
-      showToast("请完成全部检查项后再提交", "error");
+    const missing = getInspectionMissing(taskId);
+    if (missing.length) {
+      const preview = missing
+        .slice(0, 2)
+        .map((item) => item.label)
+        .join("；");
+      showToast(
+        `还差 ${missing.length} 项：${preview}${
+          missing.length > 2 ? "；请继续完成其余项目" : ""
+        }`,
+        "error",
+      );
+      const categoryId = missing[0].categoryId;
+      const target = document.querySelector(
+        `.inspection-side-item[data-category="${categoryId}"]`,
+      );
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.classList.add("needs-attention");
+      window.setTimeout(
+        () => target?.classList.remove("needs-attention"),
+        2200,
+      );
       return;
     }
     const pass = items.filter((item) => draft.ratings[item.id] === "pass");
     const fail = items.filter((item) => draft.ratings[item.id] === "fail");
-    const missingPhoto = fail.find(
-      (item) => !isPhotoReady(draft.itemPhotos?.[item.id]),
-    );
-    if (missingPhoto) {
-      showToast(`请为不符合项「${missingPhoto.title}」拍照`, "error");
-      return;
-    }
-    const missingNote = fail.find(
-      (item) => !String(draft.notes?.[item.id] || "").trim(),
-    );
-    if (missingNote) {
-      showToast(`请填写不符合项「${missingNote.title}」的问题反馈`, "error");
-      return;
-    }
-    const missingCategoryPhoto = template.categories.find((category) => {
-      const photos = draft.categoryPhotos?.[category.id] || [];
-      return (
-        !Array.from(
-          { length: category.photoCount || 0 },
-          (_, index) => photos[index],
-        ).every((photo) => isPhotoReady(photo))
-      );
-    });
-    if (missingCategoryPhoto) {
-      showToast(
-        `请按内容要求完成「${missingCategoryPhoto.name}」大项留档照及 AI 自检`,
-        "error",
-      );
-      return;
-    }
-    const missingFeedbackCategory = template.categories.find(
-      (category) =>
-        !String(draft.categoryFeedback?.[category.id] || "").trim(),
-    );
-    if (missingFeedbackCategory) {
-      showToast(
-        `请填写「${missingFeedbackCategory.name}」大项整体反馈`,
-        "error",
-      );
-      return;
-    }
     const score = pass.length + fail.length ? Math.round((pass.length / (pass.length + fail.length)) * 100) : 100;
     task.status = "submitted";
     task.reviewStatus = "pending_review";
     task.progress = 100;
     task.resultScore = score;
-    task.completedAt = "2026-11-25";
+    task.completedAt = currentDateIso();
     const store = storeById(task.storeId);
     task.completionNote = `本次巡店得分 ${score}，等待区域经理审核。`;
     const createdIssues = [];
@@ -8409,7 +8644,7 @@
         category: item.categoryName,
         severity: item.severity === "high" ? "high" : "normal",
         status: "pending",
-        due: item.categoryName === "安全" ? "立即整改" : "2026-11-28",
+        due: item.categoryName === "安全" ? "立即整改" : dateIsoOffset(2),
         overdue: false,
         description: draft.notes[item.id],
         itemPhotoCount: isPhotoReady(draft.itemPhotos?.[item.id]) ? 1 : 0,
@@ -8417,9 +8652,9 @@
           (draft.categoryPhotos?.[item.categoryId] || []).filter(isPhotoReady)
             .length,
         categoryFeedback: draft.categoryFeedback?.[item.categoryId] || "",
-        reporter: task.inspector,
+        reporter: taskInspectorName(task),
         assignee: store.manager,
-        createdAt: "2026-11-25",
+        createdAt: currentDateIso(),
       });
       createdIssues.push(issueId);
     });
@@ -8596,7 +8831,9 @@
     state.page = page;
     if (page === "learning") learningLoaded = false;
     saveState();
+    closeModal(true);
     closeDrawer();
+    closeCameraCapture();
     renderApp();
     window.scrollTo({ top: 0, behavior: "smooth" });
     if (page === "learning") loadLearningProgress(true);
@@ -8687,21 +8924,25 @@
       const task = taskById(target.dataset.taskId);
       if (!task) return;
       const approved = target.dataset.decision === "approve";
+      const reviewedAt = currentDateIso();
+      const reviewer = currentActorName("审核人");
       if (approved) {
         task.status = "completed";
         task.reviewStatus = "approved";
         task.reviewComment = "上级审核通过";
-        task.reviewedBy = "黄庆";
-        task.reviewedAt = "2026-11-25";
+        task.reviewedBy = reviewer;
+        task.reviewedAt = reviewedAt;
         if (task.taskType === "inspection" && task.resultScore) {
           const store = storeById(task.storeId);
           store.score = task.resultScore;
-          store.lastInspection = "2026-11-25";
+          store.lastInspection = reviewedAt;
         }
       } else {
         task.status = "in_progress";
         task.reviewStatus = "rejected";
         task.reviewComment = "上级审核驳回，请补充完成结果后重新提交";
+        task.reviewedBy = reviewer;
+        task.reviewedAt = reviewedAt;
       }
       saveState();
       closeModal();
@@ -8772,10 +9013,10 @@
     }
     if (action === "save-route") {
       state.route = {
-        date: "2026-11-25",
+        date: currentDateIso(),
         storeIds: [...ui.routeDraft],
-        plannedBy: "黄庆",
-        updatedAt: "2026-11-25",
+        plannedBy: currentActorName("督导"),
+        updatedAt: currentDateIso(),
       };
       saveState();
       closeModal();
@@ -8874,22 +9115,7 @@
       return;
     }
     if (action === "reset-account-pin") {
-      const account = state.accounts.find(
-        (item) => item.id === target.dataset.accountId,
-      );
-      if (!account) return;
-      const newPin = window.prompt(
-        `为「${account.name}」设置新登录密码（至少 6 位）`,
-      );
-      if (newPin === null) return;
-      const pin = String(newPin).trim();
-      if (pin.length < 6) {
-        showToast("登录密码至少 6 位", "error");
-        return;
-      }
-      account.pin = pin;
-      saveState();
-      showToast(`「${account.name}」的登录密码已更新`);
+      openResetAccountPinModal(target.dataset.accountId);
       return;
     }
     if (action === "delete-account") {
@@ -9008,27 +9234,7 @@
         showToast("门店没有复核权限", "error");
         return;
       }
-      const issue = issueById(target.dataset.issueId);
-      if (!issue) return;
-      const reason = window.prompt(
-        "请输入驳回原因",
-        "整改凭证不符合要求，请重新整改",
-      );
-      if (reason === null) return;
-      issue.status = "rectifying";
-      issue.reviewResult = "rejected";
-      issue.reviewComment =
-        String(reason).trim() || "整改凭证不符合要求，请重新整改";
-      issue.reviewedAt = new Date().toISOString();
-      issue.reviewedBy = currentAccount()?.name || "";
-      const store = storeById(issue.storeId);
-      store.issues = state.issues.filter(
-        (item) => item.storeId === store.id && item.status !== "closed",
-      ).length;
-      saveState();
-      openIssueDrawer(issue.id);
-      renderApp();
-      showToast("整改已驳回门店重新处理");
+      openRejectIssueModal(target.dataset.issueId);
       return;
     }
     if (
@@ -9347,7 +9553,7 @@
       const store = storeById(task.storeId);
       downloadFile(
         `${store.name}-巡店报告.txt`,
-        `${store.name}巡店报告\n任务：${task.title}\n督导：${task.inspector}\n得分：${task.resultScore}\n提交时间：${task.completedAt || task.dueLabel}\n\n由巡店云自动生成`,
+        `${store.name}巡店报告\n任务：${task.title}\n督导：${taskInspectorName(task)}\n得分：${task.resultScore}\n提交时间：${task.completedAt || task.dueLabel}\n\n由巡店云自动生成`,
         "text/plain;charset=utf-8",
       );
       showToast("巡店报告已下载");
@@ -9571,13 +9777,83 @@
     }
   });
 
+  document.addEventListener(
+    "invalid",
+    (event) => {
+      const field = event.target;
+      if (!field || field.dataset.invalidNotified === "true") return;
+      field.dataset.invalidNotified = "true";
+      const label =
+        field.closest("label")?.textContent?.trim().split(/\s+/)[0] ||
+        "必填项";
+      showToast(`${label}未填写或格式不正确`, "error");
+      field.focus();
+      window.setTimeout(() => {
+        delete field.dataset.invalidNotified;
+      }, 1500);
+    },
+    true,
+  );
+
   document.addEventListener("submit", async (event) => {
+    if (event.target.id === "resetAccountPinForm") {
+      event.preventDefault();
+      const account = state.accounts.find(
+        (item) => item.id === event.target.dataset.accountId,
+      );
+      const pin = String(
+        new FormData(event.target).get("pin") || "",
+      ).trim();
+      if (!account) return;
+      if (pin.length < 6) {
+        showToast("登录密码至少 6 位", "error");
+        return;
+      }
+      account.pin = pin;
+      saveState();
+      closeModal();
+      renderApp();
+      showToast(`「${account.name}」的登录密码已更新`);
+      return;
+    }
+    if (event.target.id === "rejectIssueForm") {
+      event.preventDefault();
+      const issue = issueById(event.target.dataset.issueId);
+      const reason = String(
+        new FormData(event.target).get("reason") || "",
+      ).trim();
+      if (!issue) return;
+      if (!reason) {
+        showToast("请填写驳回原因", "error");
+        return;
+      }
+      issue.status = "rectifying";
+      issue.reviewResult = "rejected";
+      issue.reviewComment = reason;
+      issue.reviewedAt = new Date().toISOString();
+      issue.reviewedBy = currentActorName("审核人");
+      const store = storeById(issue.storeId);
+      store.issues = state.issues.filter(
+        (item) => item.storeId === store.id && item.status !== "closed",
+      ).length;
+      saveState();
+      closeModal();
+      renderApp();
+      openIssueDrawer(issue.id);
+      showToast("整改已驳回，门店将收到驳回原因");
+      return;
+    }
     if (event.target.id === "learningExamForm") {
       event.preventDefault();
       const data = new FormData(event.target);
-      const answers = learningExamQuestions.map((question) =>
-        Number(data.get(question.id)),
+      const rawAnswers = learningExamQuestions.map((question) =>
+        data.get(question.id),
       );
+      if (rawAnswers.some((answer) => answer === null || answer === "")) {
+        showToast("还有题目未作答，请完成后再次提交", "error");
+        return;
+      }
+      const answers = rawAnswers.map(Number);
       const correct = learningExamQuestions.filter(
         (question, index) => answers[index] === question.answer,
       ).length;
@@ -9595,12 +9871,7 @@
       if (!item) return;
       closeModal();
       renderApp();
-      showToast(
-        score >= 80
-          ? `考试通过，得分 ${score} 分`
-          : `本次得分 ${score} 分，未达到 80 分，请学习后补考`,
-        score >= 80 ? "success" : "error",
-      );
+      openExamResult({ score, answers });
       return;
     }
     if (event.target.id === "feedbackForm") {
@@ -9688,6 +9959,7 @@
       const pin = String(data.get("pin") || "").trim();
       if (CLOUD_API_BASE) {
         const submit = event.target.querySelector('[type="submit"]');
+        setLoginError("");
         if (submit) {
           submit.disabled = true;
           submit.textContent = "正在登录云端…";
@@ -9711,7 +9983,12 @@
           renderApp();
           showToast(`已登录云端：${user.name} · ${user.role}`);
         } catch (error) {
-          showToast(error.message || "云端登录失败", "error");
+          const message =
+            error.status === 443 || /failed to fetch|network/i.test(error.message)
+              ? "云端服务暂时不可用，请检查网络后重试"
+              : error.message || "云端登录失败";
+          setLoginError(message);
+          showToast(message, "error");
           if (submit) {
             submit.disabled = false;
             submit.textContent = "登录";
@@ -9719,19 +9996,25 @@
         }
         return;
       }
+      setLoginError("云端认证未配置，暂时无法登录");
+      showToast("云端认证未配置，暂时无法登录", "error");
+      return;
       const account = state.accounts.find(
         (item) =>
           String(item.loginId || "").toLowerCase() === loginId &&
           String(item.pin || "") === pin,
       );
       if (!account) {
+        setLoginError("账号或密码不正确");
         showToast("账号或密码不正确", "error");
         return;
       }
       if (account.status !== "启用") {
+        setLoginError("该账号尚未启用，请联系区域经理");
         showToast("该账号尚未启用，请联系区域经理", "error");
         return;
       }
+      setLoginError("");
       state.currentAccountId = account.id;
       state.authenticated = true;
       applyAccountAccess(account);
@@ -9765,7 +10048,7 @@
         address: data.get("address"),
         manager: "门店小伙伴",
         managerInitials: "门",
-        inspector: data.get("inspector") || "黄庆",
+        inspector: data.get("inspector") || currentActorName("督导"),
         score: null,
         lastInspection: "未巡检",
         issues: 0,
@@ -9808,7 +10091,7 @@
       task.status = "submitted";
       task.reviewStatus = "pending_review";
       task.progress = 100;
-      task.completedAt = "2026-11-25";
+      task.completedAt = currentDateIso();
       saveState();
       closeModal();
       renderApp();
@@ -9964,7 +10247,8 @@
         month: `${Number(month)}月`,
         dueLabel: `${Number(month)}月 ${Number(day)}日`,
         inspector:
-          assigneeRole === "store" ? "门店小伙伴" : creator,
+          assigneeRole === "store" ? "门店小伙伴" : "待督导领取",
+        inspectorAccountId: "",
         createdBy: creator,
         createdByAccountId: currentAccount()?.id || "",
         description: data.get("description"),
@@ -10002,9 +10286,12 @@
         dueLabel: `现场发起 · ${data.get("time") || "15:30"}`,
         status: "in_progress",
         progress: 0,
-        inspector: "黄庆",
+        inspector: currentActorName("督导"),
+        inspectorAccountId: currentAccount()?.id || "",
         note: data.get("note"),
         initiatedBy: "督导现场",
+        createdBy: currentActorName("督导"),
+        createdByAccountId: currentAccount()?.id || "",
       });
       saveState();
       closeDrawer();
@@ -10019,6 +10306,9 @@
       const storeId = data.get("storeId");
       const templateId = data.get("templateId");
       const isUrgent = data.get("priority") === "urgent";
+      const inspectorAccount = state.accounts.find(
+        (account) => account.id === data.get("inspector"),
+      );
       state.tasks.unshift({
         id: `task-${Date.now()}`,
         storeId,
@@ -10029,7 +10319,11 @@
         dueLabel: `${Number(month)}月 ${Number(day)}日 ${data.get("time") || "14:00"}`,
         status: isUrgent ? "urgent" : "pending",
         progress: 0,
-        inspector: data.get("inspector"),
+        inspector: inspectorAccount?.name || currentActorName("督导"),
+        inspectorAccountId:
+          inspectorAccount?.id || currentAccount()?.id || "",
+        createdBy: currentActorName("区域经理"),
+        createdByAccountId: currentAccount()?.id || "",
         note: data.get("note"),
       });
       saveState();
@@ -10055,7 +10349,7 @@
         description:
           data.get("description") ||
           "现场巡检发现该问题，请门店负责人按运营标准及时整改。",
-        reporter: "黄庆",
+        reporter: currentActorName("区域经理"),
         assignee: store.manager,
         createdAt: "刚刚",
       });
