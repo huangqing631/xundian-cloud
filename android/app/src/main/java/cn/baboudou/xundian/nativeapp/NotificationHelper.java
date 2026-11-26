@@ -8,6 +8,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 
+import me.leolin.shortcutbadger.ShortcutBadger;
+
 public final class NotificationHelper {
     public static final String CHANNEL_ID = "xundian_tasks";
 
@@ -74,6 +76,8 @@ public final class NotificationHelper {
             .setStyle(new Notification.BigTextStyle().bigText(body))
             .setAutoCancel(true)
             .setContentIntent(contentIntent)
+            .setGroup("xundian_cloud_messages")
+            .setWhen(System.currentTimeMillis())
             .setNumber(Math.max(1, badgeCount))
             .setPriority(Notification.PRIORITY_HIGH)
             .setCategory(Notification.CATEGORY_REMINDER);
@@ -87,5 +91,54 @@ public final class NotificationHelper {
 
     public static int requestCode(String id) {
         return Math.abs((id == null ? "xundian" : id).hashCode() % 100000);
+    }
+
+    public static void applyBadge(Context context, int count) {
+        int value = Math.max(0, count);
+        try {
+            if (value > 0) {
+                ShortcutBadger.applyCount(context, value);
+            } else {
+                ShortcutBadger.removeCount(context);
+            }
+        } catch (Exception ignored) {
+            // Some Android-compatible launchers only support vendor broadcasts.
+        }
+
+        String packageName = context.getPackageName();
+        String activityName = MainActivity.class.getName();
+        sendBadgeBroadcast(
+            context,
+            "com.huawei.android.launcher.action.CHANGE_BADGE",
+            packageName,
+            activityName,
+            value
+        );
+        sendBadgeBroadcast(
+            context,
+            "com.hihonor.android.launcher.action.CHANGE_BADGE",
+            packageName,
+            activityName,
+            value
+        );
+    }
+
+    private static void sendBadgeBroadcast(
+        Context context,
+        String action,
+        String packageName,
+        String activityName,
+        int count
+    ) {
+        try {
+            Intent intent = new Intent(action);
+            intent.putExtra("package", packageName);
+            intent.putExtra("class", activityName);
+            intent.putExtra("badgenumber", count);
+            intent.putExtra("badgecount", count);
+            context.sendBroadcast(intent);
+        } catch (Exception ignored) {
+            // The active launcher may not register this vendor broadcast.
+        }
     }
 }

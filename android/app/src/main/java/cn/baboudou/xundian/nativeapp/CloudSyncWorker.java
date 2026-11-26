@@ -12,8 +12,6 @@ import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
-import me.leolin.shortcutbadger.ShortcutBadger;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -140,11 +138,7 @@ public class CloudSyncWorker extends Worker {
                 prefs.edit()
                     .putInt("unreadBadgeCount", unreadCount)
                     .apply();
-                try {
-                    ShortcutBadger.applyCount(context, unreadCount);
-                } catch (Exception ignored) {
-                    // The active launcher may only support a notification dot.
-                }
+                NotificationHelper.applyBadge(context, unreadCount);
             }
             prefs.edit().putLong("lastNotificationAt", cursor).apply();
             return Result.success();

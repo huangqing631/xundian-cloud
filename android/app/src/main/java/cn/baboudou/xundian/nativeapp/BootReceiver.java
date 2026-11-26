@@ -8,5 +8,10 @@ public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         ReminderScheduler.rescheduleAll(context);
+        CloudSyncWorker.configure(context);
+        int badgeCount = context
+            .getSharedPreferences("xundian_cloud", Context.MODE_PRIVATE)
+            .getInt("unreadBadgeCount", 0);
+        NotificationHelper.applyBadge(context, badgeCount);
     }
 }
