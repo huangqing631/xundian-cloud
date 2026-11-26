@@ -1,4 +1,4 @@
-const CACHE_NAME = "xundian-cloud-v30";
+const CACHE_NAME = "xundian-cloud-v40";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./icon-192.png",
   "./icon-512.png",
   "./manifest.webmanifest",
+  "./version.json",
 ];
 
 self.addEventListener("install", (event) => {
