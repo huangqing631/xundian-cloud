@@ -2,7 +2,7 @@
   "use strict";
 
   const STORAGE_KEY = "xundian-cloud:v5";
-  const APP_VERSION = "2026.11.25.30";
+  const APP_VERSION = "2026.11.26.41";
   const CLOUD_API_BASE = String(
     window.XUNDIAN_CLOUD_API_BASE ||
       localStorage.getItem("xundian-cloud-api-base") ||
@@ -11,6 +11,7 @@
   const CLOUD_TOKEN_KEY = "xundian-cloud-token";
   const CLOUD_REVISION_KEY = "xundian-cloud-revision";
   const CLOUD_NOTIFICATION_CURSOR_KEY = "xundian-cloud-notification-cursor";
+  const LAUNCHER_BADGE_KEY = "xundian-actionable-badge-count";
   let cloudReady = false;
   let cloudRevision = Number(localStorage.getItem(CLOUD_REVISION_KEY) || 0);
   let cloudSyncTimer = null;
@@ -1721,6 +1722,8 @@
           : task.status === "submitted"
             ? "pending_review"
             : "not_submitted"),
+      priority:
+        task.priority || (task.status === "urgent" ? "紧急" : "普通"),
       createdBy:
         normalizeAccountRole(task.createdBy) || "督导现场",
     }));
@@ -1833,34 +1836,58 @@
     assignTaskPhotos: [],
     mobileTab: "home",
     reportPeriod: "month",
+    pageHistory: [],
   };
 
   const launchParams = new URLSearchParams(window.location.search);
   const launchPage = launchParams.get("page");
+  const appPlatform =
+    launchParams.get("platform") ||
+    (window.XundianNative?.isNativeApp?.() ? "android" : "web");
   const nativeBridge = window.XundianNative || null;
   const isNativeApp =
     launchParams.get("native") === "1" ||
     Boolean(nativeBridge?.isNativeApp?.());
   const NATIVE_APP_VERSION = nativeBridge?.getAppVersion?.() || "";
   const RELEASE_FEED_URL = isNativeApp
-    ? "https://huangqing631.github.io/xundian-cloud/version.json"
+    ? "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/web/version.json"
     : "./version.json";
   if (isNativeApp) {
     document.documentElement.classList.add("native-app");
   }
-  if (launchPage) {
-    if (state.role === "store") {
-      if (launchPage === "issues") ui.mobileTab = "issues";
-      else if (launchPage === "tasks") ui.mobileTab = "tasks";
-    } else if (
-      ["overview", "tasks", "issues", "stores", "reports"].includes(
-        launchPage,
-      )
+  let launchTargetPending = Boolean(launchPage);
+
+  function applyLaunchTarget() {
+    if (
+      !launchTargetPending ||
+      !state.authenticated ||
+      !currentAccount()
     ) {
-      state.page =
-        state.role === "supervisor" && launchPage === "tasks"
-          ? "tasks"
-          : launchPage;
+      return;
+    }
+    const page = String(launchPage || "");
+    const allowedPages = [
+      "overview",
+      "tasks",
+      "issues",
+      "learning",
+      "stores",
+      "reports",
+    ];
+    if (!allowedPages.includes(page)) {
+      launchTargetPending = false;
+      return;
+    }
+    if (state.role === "store") {
+      ui.mobileTab =
+        page === "tasks" || page === "issues" || page === "learning"
+          ? page
+          : "home";
+    } else {
+      state.page = page;
+    }
+    if (cloudReady || !CLOUD_API_BASE || !cloudToken()) {
+      launchTargetPending = false;
     }
   }
 
@@ -1879,6 +1906,65 @@
     } catch {
       // Notification support varies across browsers and WebView versions.
     }
+  }
+
+  function setLauncherBadgeCount(count) {
+    const value = Math.max(0, Number(count) || 0);
+    try {
+      localStorage.setItem(LAUNCHER_BADGE_KEY, String(value));
+    } catch {
+      // Badge persistence is optional.
+    }
+    try {
+      nativeBridge?.setBadgeContext?.(
+        state.role || "",
+        state.storeId || "",
+      );
+    } catch {
+      // Older native shells do not persist the account context.
+    }
+    try {
+      nativeBridge?.setBadgeCount?.(value);
+    } catch {
+      // Non-Android shells use the Web Badging API below.
+    }
+    try {
+      if (value > 0) navigator.setAppBadge?.(value);
+      else navigator.clearAppBadge?.();
+    } catch {
+      // Browser support varies by platform and launcher.
+    }
+  }
+
+  function actionableBadgeCount() {
+    if (!state.authenticated) return 0;
+    const taskNeedsAction = (task) => {
+      if (!task || task.status === "completed") return false;
+      if (state.role === "store") {
+        return (
+          task.storeId === state.storeId &&
+          task.assigneeRole === "store" &&
+          task.status !== "submitted"
+        );
+      }
+      if (state.role === "supervisor") {
+        return (
+          task.assigneeRole === "supervisor" &&
+          task.status !== "submitted"
+        );
+      }
+      return true;
+    };
+    const issueNeedsAction = (issue) =>
+      Boolean(
+        issue &&
+          issue.status !== "closed" &&
+          (state.role !== "store" || issue.storeId === state.storeId),
+      );
+    return (
+      state.tasks.filter(taskNeedsAction).length +
+      state.issues.filter(issueNeedsAction).length
+    );
   }
 
   async function enableDeviceNotifications() {
@@ -2412,14 +2498,33 @@
     );
   }
 
+  function cameraLensScore(label) {
+    const value = String(label || "");
+    if (/(front|user|前置|自拍)/i.test(value)) return 99;
+    if (/(tele|telephoto|长焦|微距|macro|depth|景深|mono|黑白)/i.test(value)) {
+      return 90;
+    }
+    if (/(ultra.?wide|ultrawide|超广角|0[.,]5\s*[x×]?)/i.test(value)) {
+      return 0;
+    }
+    if (/(camera2 0|camera 0|facing back|back camera|rear camera|广角|wide)/i.test(value)) {
+      return 1;
+    }
+    if (/(back|rear|后置)/i.test(value)) return 3;
+    return 6;
+  }
+
   function updateCameraLensUi() {
     const label = document.getElementById("cameraLensLabel");
     if (!label) return;
     const device = availableCameraDevices.find(
       (item) => item.deviceId === currentCameraDeviceId,
     );
-    label.textContent = isWideCameraLabel(device?.label)
-      ? "广角"
+    const score = cameraLensScore(device?.label);
+    label.textContent = score === 0
+      ? "超广角"
+      : score <= 3
+        ? "广角"
       : availableCameraDevices.length > 1
         ? "镜头"
         : "广角";
@@ -2429,9 +2534,9 @@
     activeCameraStream?.getTracks().forEach((track) => track.stop());
     activeCameraStream = null;
     const baseVideo = {
-      width: { ideal: 1280 },
-      height: { ideal: 960 },
-      aspectRatio: { ideal: 4 / 3 },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      aspectRatio: { ideal: 16 / 9 },
     };
     try {
       activeCameraStream = await navigator.mediaDevices.getUserMedia({
@@ -2487,12 +2592,22 @@
     availableCameraDevices = devices.filter(
       (item) => item.kind === "videoinput",
     );
-    const wideDevice = availableCameraDevices.find(
-      (item) =>
-        item.deviceId !== currentCameraDeviceId &&
-        isWideCameraLabel(item.label) &&
-        !isFrontCameraLabel(item.label),
+    const currentScore = cameraLensScore(
+      availableCameraDevices.find(
+        (item) => item.deviceId === currentCameraDeviceId,
+      )?.label,
     );
+    const wideDevice = availableCameraDevices
+      .filter(
+        (item) =>
+          item.deviceId !== currentCameraDeviceId &&
+          !isFrontCameraLabel(item.label) &&
+          cameraLensScore(item.label) < currentScore,
+      )
+      .sort(
+        (left, right) =>
+          cameraLensScore(left.label) - cameraLensScore(right.label),
+      )[0];
     if (preferWide && wideDevice) {
       await startCameraStream(wideDevice.deviceId, false);
       return;
@@ -2864,6 +2979,41 @@
     })}`;
   }
 
+  function latestBusinessDateLabel() {
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function latestBusinessDateChineseLabel() {
+    return latestBusinessDateLabel()
+      .split("-")
+      .map((part, index) => (index === 0 ? `${part}年` : index === 1 ? `${Number(part)}月` : `${Number(part)}日`))
+      .join("");
+  }
+
+  function greetingText() {
+    const hour = new Date().getHours();
+    if (hour < 6) return "凌晨好";
+    if (hour < 12) return "上午好";
+    if (hour < 14) return "中午好";
+    if (hour < 18) return "下午好";
+    return "晚上好";
+  }
+
+  function trendDateLabels(count = 6, intervalDays = 4) {
+    const anchor = new Date();
+    anchor.setDate(anchor.getDate() - 1);
+    return Array.from({ length: count }, (_, index) => {
+      const date = new Date(anchor);
+      date.setDate(anchor.getDate() - (count - index - 1) * intervalDays);
+      return `${date.getMonth() + 1}/${String(date.getDate()).padStart(2, "0")}`;
+    });
+  }
+
   function completedTaskRate() {
     return Math.round(
       (state.tasks.filter((task) => task.status === "completed").length /
@@ -2889,7 +3039,7 @@
       completed: { label: "已完成", className: "success" },
       rectifying: { label: "整改中", className: "warning" },
       review: { label: "待复核", className: "purple" },
-      closed: { label: "已关闭", className: "success" },
+      closed: { label: "复核通过", className: "success" },
     };
     return map[status] || { label: status, className: "neutral" };
   }
@@ -3089,6 +3239,12 @@
   }
 
   function renderTopbar() {
+    const supervisorUpdateEntry =
+      state.role === "supervisor"
+        ? `<button class="version-update-entry" data-action="check-update" aria-label="版本与更新" title="版本与更新">
+            ${icon("refresh", "icon-sm")} <span class="version-update-label">版本与更新</span>
+          </button>`
+        : "";
     return `
       <header class="topbar">
         <button class="icon-button mobile-menu-button" data-action="navigate" data-page="overview" aria-label="返回工作台">
@@ -3101,7 +3257,7 @@
         <label class="topbar-search">
           ${icon("search", "icon-sm")}
           <input id="globalSearch" type="search" placeholder="搜索门店、任务或问题…" autocomplete="off" />
-          <kbd>Enter</kbd>
+          <kbd>回车</kbd>
         </label>
         <div class="top-actions">
           ${renderRoleSelect()}
@@ -3110,7 +3266,8 @@
             <span class="notification-dot"></span>
           </button>
           <button class="icon-button" data-action="feedback-center" aria-label="反馈与建议" title="反馈与建议">${icon("message")}</button>
-          ${isNativeApp ? "" : `<a class="icon-button" href="./xundian-cloud-native.apk" download aria-label="下载 Android App" title="下载 Android App">${icon("download")}</a>`}
+          ${supervisorUpdateEntry}
+          ${isNativeApp || state.role === "supervisor" ? "" : `<a class="icon-button" href="./xundian-cloud-native.apk" download aria-label="下载 Android App" title="下载 Android App">${icon("download")}</a>`}
           <button class="logout-text-button" data-action="logout">退出</button>
           ${renderAvatar(currentAccount()?.name || "用户", "avatar-green")}
         </div>
@@ -3175,9 +3332,6 @@
         : "";
     if (state.page === "management") {
       return `
-        <button class="button button-secondary" data-action="check-update">
-          ${icon("refresh", "icon-sm")} 检查更新
-        </button>
         ${assignTaskButton}
       `;
     }
@@ -3202,11 +3356,7 @@
       `;
     }
     if (state.page === "approvals") {
-      return `
-        <button class="button button-secondary" data-action="refresh-data">
-          ${icon("refresh", "icon-sm")} 刷新申请
-        </button>
-      `;
+      return "";
     }
     if (state.page === "reports") {
       return `
@@ -3218,9 +3368,6 @@
     }
     if (state.page === "issues") {
       return `
-        <button class="button button-secondary" data-action="refresh-data">
-          ${icon("refresh", "icon-sm")} 刷新
-        </button>
         <button class="button button-primary" data-action="new-issue">
           ${icon("plus", "icon-sm")} 新建问题
         </button>
@@ -3249,13 +3396,7 @@
       `;
     }
     if (state.role === "supervisor") {
-      return `
-        <button class="button button-secondary" data-action="refresh-data">
-          ${icon("refresh", "icon-sm")} 刷新
-        </button>
-        ${planRouteButton}
-        ${startVisitButton}
-      `;
+      return startVisitButton;
     }
     return `<button class="button button-secondary" data-action="weekly-report">
       ${icon("file", "icon-sm")} 生成周报
@@ -3263,14 +3404,14 @@
   }
 
   function renderPreviewTaskList() {
-    const tasks = state.tasks
-      .filter(
+    const tasks = sortTasksByPriorityAndDue(
+      state.tasks.filter(
         (task) =>
           task.status !== "completed" &&
           (state.role !== "supervisor" ||
             task.assigneeRole === "supervisor"),
-      )
-      .slice(0, 3);
+      ),
+    ).slice(0, 3);
     return tasks
       .map((task) => {
         const store = storeById(task.storeId);
@@ -3418,7 +3559,7 @@
         <div class="page-header">
           <div class="page-heading">
             <div class="eyebrow">${isSupervisor ? "Field operations" : "Store overview"}</div>
-            <h1>${isSupervisor ? "巡店打卡" : "下午好，黄庆"}</h1>
+            <h1>${isSupervisor ? "巡店打卡" : `${greetingText()}，${escapeHtml(currentAccount()?.name || "区域经理")}`}</h1>
             <p>${
               isSupervisor
                 ? `商丘区域 10 家门店，当前有 ${supervisorOpenTaskCount()} 项任务待执行。`
@@ -3522,7 +3663,7 @@
                   }>${isSupervisor ? supervisorOpenTaskCount() : formatMoney(sales)}</span>
                   <span class="stat-unit">${isSupervisor ? "项" : ""}</span>
                 </div>
-                <div class="stat-foot">${isSupervisor ? "今日计划" : "10 家门店 · 2026-11-24"}</div>
+                <div class="stat-foot">${isSupervisor ? "今日计划" : `10 家门店 · ${latestBusinessDateLabel()}`}</div>
               </article>
               <article class="stat-card" style="--accent: var(--green); --tint: var(--green-soft)">
                 <div class="stat-head">
@@ -3707,18 +3848,85 @@
   }
 
   function filteredTasks() {
-    return state.tasks.filter((task) => {
-      const store = storeById(task.storeId);
-      const assigneeMatch =
-        state.role !== "supervisor" || task.assigneeRole === "supervisor";
-      const statusMatch =
-        ui.taskFilter === "all" ||
-        (ui.taskFilter === "pending" &&
-          ["pending", "urgent"].includes(task.status)) ||
-        task.status === ui.taskFilter;
-      const query = ui.taskQuery.trim().toLowerCase();
-      const text = `${task.title} ${store?.name || "商丘区域"} ${task.inspector}`.toLowerCase();
-      return assigneeMatch && statusMatch && (!query || text.includes(query));
+    return sortTasksByPriorityAndDue(
+      state.tasks.filter((task) => {
+        const store = storeById(task.storeId);
+        const assigneeMatch =
+          state.role !== "supervisor" || task.assigneeRole === "supervisor";
+        const statusMatch =
+          ui.taskFilter === "all" ||
+          (ui.taskFilter === "pending" &&
+            ["pending", "urgent"].includes(task.status)) ||
+          task.status === ui.taskFilter;
+        const query = ui.taskQuery.trim().toLowerCase();
+        const text = `${task.title} ${store?.name || "商丘区域"} ${task.inspector}`.toLowerCase();
+        return assigneeMatch && statusMatch && (!query || text.includes(query));
+      }),
+    );
+  }
+
+  function taskPriorityRank(task) {
+    if (task.status === "completed") return -1;
+    if (task.status === "urgent" || task.reviewStatus === "rejected") return 3;
+    return (
+      {
+        紧急: 3,
+        重要: 2,
+        普通: 1,
+      }[task.priority] || 1
+    );
+  }
+
+  function taskDueTimestamp(task) {
+    const label = String(task.dueLabel || "").trim();
+    const now = new Date();
+    let match = label.match(
+      /(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?/,
+    );
+    if (match) {
+      return new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+        Number(match[4] || 23),
+        Number(match[5] || 59),
+      ).getTime();
+    }
+    match = label.match(/^(今天|明天)\s*(\d{1,2}):(\d{2})/);
+    if (match) {
+      const date = new Date(now);
+      if (match[1] === "明天") date.setDate(date.getDate() + 1);
+      date.setHours(Number(match[2]), Number(match[3]), 0, 0);
+      return date.getTime();
+    }
+    match = label.match(/(\d{1,2})月\s*(\d{1,2})日/);
+    if (match) {
+      return new Date(
+        now.getFullYear(),
+        Number(match[1]) - 1,
+        Number(match[2]),
+        23,
+        59,
+      ).getTime();
+    }
+    if (label.includes("现场发起")) {
+      const time = label.match(/(\d{1,2}):(\d{2})/);
+      const date = new Date(now);
+      if (time) date.setHours(Number(time[1]), Number(time[2]), 0, 0);
+      return date.getTime();
+    }
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  function sortTasksByPriorityAndDue(tasks) {
+    return [...tasks].sort((left, right) => {
+      const priorityDiff =
+        taskPriorityRank(right) - taskPriorityRank(left);
+      if (priorityDiff !== 0) return priorityDiff;
+      const dueDiff =
+        taskDueTimestamp(left) - taskDueTimestamp(right);
+      if (dueDiff !== 0) return dueDiff;
+      return String(left.id).localeCompare(String(right.id));
     });
   }
 
@@ -4054,7 +4262,7 @@
             <h1>${
               state.role === "supervisor" ? "整改跟进" : "整改总览"
             }</h1>
-            <p>督导问题照与门店整改照双留档，门店提交反馈后由督导复核关闭。</p>
+            <p>门店提交整改反馈后由督导或区域经理复核，可选择通过或驳回。</p>
           </div>
           <div class="header-actions">${renderHeaderActions()}</div>
         </div>
@@ -4074,7 +4282,7 @@
           </article>
           <article class="summary-card">
             <span class="summary-icon" style="--accent: var(--green); --tint: var(--green-soft)">${icon("check-circle")}</span>
-            <span class="summary-copy"><strong>${counts.closed}</strong><span>本月已关闭</span></span>
+            <span class="summary-copy"><strong>${counts.closed}</strong><span>本月复核通过</span></span>
           </article>
         </div>
 
@@ -4183,7 +4391,7 @@
           <div class="page-heading">
             <div class="eyebrow">Store directory</div>
             <h1>门店档案</h1>
-            <p>商丘区域 10 家门店，联合展示 11月24日销售、毛利与巡店状态。</p>
+            <p>商丘区域 10 家门店，联合展示 ${latestBusinessDateChineseLabel()}销售、毛利与巡店状态。</p>
           </div>
           <div class="header-actions">${renderHeaderActions()}</div>
         </div>
@@ -4390,6 +4598,9 @@
         task.status === "submitted" ||
         task.reviewStatus === "pending_review",
     );
+    const releaseState = appReleaseState();
+    const updateAvailable = releaseState.updateAvailable;
+    const latestVersion = releaseState.latestVersion;
     return `
       <section>
         <div class="page-header">
@@ -4400,11 +4611,10 @@
           </div>
           <div class="header-actions">${renderHeaderActions()}</div>
         </div>
-        <div class="issue-summary-grid">
+        <div class="management-summary-grid">
           <article class="summary-card"><span class="summary-icon" style="--accent:var(--purple);--tint:var(--purple-soft)">${icon("check-circle")}</span><span class="summary-copy"><strong>${reviewTasks.length}</strong><span>待审核任务</span></span></article>
           <article class="summary-card"><span class="summary-icon" style="--accent:var(--blue);--tint:var(--blue-soft)">${icon("list-checks")}</span><span class="summary-copy"><strong>${state.tasks.length}</strong><span>任务总数</span></span></article>
           <article class="summary-card"><span class="summary-icon" style="--accent:var(--green);--tint:var(--green-soft)">${icon("user")}</span><span class="summary-copy"><strong>${state.accounts.length}</strong><span>人员账号</span></span></article>
-          <article class="summary-card"><span class="summary-icon" style="--accent:var(--orange);--tint:var(--orange-soft)">${icon("refresh")}</span><span class="summary-copy"><strong>${APP_VERSION}</strong><span>当前应用版本</span></span></article>
         </div>
         <div class="report-summary">
           <section class="panel ranking-panel">
@@ -4439,13 +4649,19 @@
           </section>
           <section class="panel insight-card">
             <div class="panel-header" style="padding:0">
-              <div class="panel-heading"><h3>管理入口</h3><p>常用配置与系统能力</p></div>
+              <div class="panel-heading"><h3>管理入口</h3><p>账号、系统与门店配置已按使用频率重新分组</p></div>
             </div>
             <div class="insight-list">
-              <button class="insight-item" data-action="navigate" data-page="store-settings"><span class="insight-number">1</span><p><strong>门店设置</strong><br>营业时间、状态与门店资料</p></button>
-              <button class="insight-item" data-action="navigate" data-page="accounts"><span class="insight-number">2</span><p><strong>人员账号设置</strong><br>区域经理、督导、门店小伙伴与门店绑定</p></button>
-              <button class="insight-item" data-action="check-update"><span class="insight-number">3</span><p><strong>应用更新中心</strong><br>检测新版本并让在线用户自动刷新</p></button>
-              ${isNativeApp ? `<button class="insight-item" data-action="native-update"><span class="insight-number">4</span><p><strong>下载原生版更新</strong><br>发现新版本后会发系统通知，也可在这里主动下载</p></button>` : `<a class="insight-item" href="./xundian-cloud-native.apk" download><span class="insight-number">4</span><p><strong>Android 原生安装包</strong><br>本地内置应用资源，不再依赖 Chrome 或跳出浏览器</p></a>`}
+              <div style="padding:4px 2px 6px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em">账号与权限</div>
+              <button class="insight-item" data-action="navigate" data-page="accounts"><span class="insight-number">${icon("user", "icon-sm")}</span><p><strong>人员账号设置</strong><br>新增、编辑、删除账号并维护门店绑定</p></button>
+              <button class="insight-item" data-action="navigate" data-page="approvals"><span class="insight-number">${icon("check-circle", "icon-sm")}</span><p><strong>注册审批</strong><br>审核申请人并分配角色、门店和登录权限</p></button>
+              <div style="padding:12px 2px 6px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em">门店管理</div>
+              <button class="insight-item" data-action="navigate" data-page="store-settings"><span class="insight-number">${icon("store", "icon-sm")}</span><p><strong>门店设置</strong><br>新增、编辑、删除门店及维护营业资料</p></button>
+              <div style="padding:12px 2px 6px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.08em">版本</div>
+              <button class="insight-item ${updateAvailable ? "has-update" : ""}" data-action="check-update">
+                <span class="insight-number">${icon("refresh", "icon-sm")}</span>
+                <p><strong>版本与更新 ${updateAvailable ? `<span class="badge warning no-dot">有新版本</span>` : `<span class="badge success no-dot">已是最新</span>`}</strong><br>当前版本 ${escapeHtml(APP_VERSION)}${updateAvailable && latestVersion ? ` · 最新 ${escapeHtml(latestVersion)}` : " · 有新版本时自动提醒"}</p>
+              </button>
             </div>
           </section>
         </div>
@@ -4510,13 +4726,32 @@
   }
 
   function renderReportPage() {
-    const sortedStores = state.stores.slice().sort((a, b) => b.score - a.score);
-    const categoryCounts = [
-      { name: "运营安全", count: 8, color: "var(--red)" },
-      { name: "商品陈列", count: 7, color: "var(--orange)" },
-      { name: "门店形象", count: 5, color: "var(--brand)" },
-      { name: "服务体验", count: 4, color: "var(--blue)" },
+    const sortedStores = state.stores
+      .filter((store) => Number.isFinite(store.score))
+      .sort((a, b) => b.score - a.score);
+    const categoryPalette = [
+      "var(--red)",
+      "var(--orange)",
+      "var(--brand)",
+      "var(--blue)",
+      "var(--green)",
     ];
+    const categoryTotals = state.issues.reduce((totals, issue) => {
+      const category = issue.category || "其他";
+      totals[category] = (totals[category] || 0) + 1;
+      return totals;
+    }, {});
+    const categoryCounts = Object.entries(categoryTotals)
+      .sort((left, right) => right[1] - left[1])
+      .map(([name, count], index) => ({
+        name,
+        count,
+        color: categoryPalette[index % categoryPalette.length],
+      }));
+    const maxCategoryCount = Math.max(
+      1,
+      ...categoryCounts.map((category) => category.count),
+    );
     return `
       <section>
         <div class="page-header">
@@ -4542,7 +4777,7 @@
                 <h3>门店评分趋势</h3>
                 <p>近 7 次巡检平均得分</p>
               </div>
-              <span class="badge success">持续提升</span>
+              <span class="badge info">趋势参考</span>
             </div>
             <div class="trend-chart">
               <div class="trend-chart-grid"><i></i><i></i><i></i><i></i></div>
@@ -4562,7 +4797,7 @@
                 <circle class="dot" cx="500" cy="58" r="5"/>
                 <circle class="dot" cx="600" cy="33" r="5"/>
               </svg>
-              <div class="trend-labels"><span>11/04</span><span>11/08</span><span>11/12</span><span>11/16</span><span>11/20</span><span>11/25</span></div>
+              <div class="trend-labels">${trendDateLabels().map((label) => `<span>${label}</span>`).join("")}</div>
             </div>
           </section>
 
@@ -4570,7 +4805,7 @@
             <div class="panel-header" style="padding: 0">
               <div class="panel-heading">
                 <h3>问题类型分布</h3>
-                <p>本月共记录 24 项问题</p>
+                <p>本月共记录 ${state.issues.length} 项问题</p>
               </div>
             </div>
             <div class="category-list">
@@ -4580,7 +4815,7 @@
                     <div class="category-row">
                       <div class="category-row-label"><span>${category.name}</span><span>${category.count} 项</span></div>
                       <div class="category-track"><span style="width: ${
-                        (category.count / 10) * 100
+                        (category.count / maxCategoryCount) * 100
                       }%; --accent: ${category.color}"></span></div>
                     </div>
                   `,
@@ -4600,21 +4835,25 @@
               <button class="panel-link" data-action="export-report">导出 ${icon("download", "icon-sm")}</button>
             </div>
             <div class="ranking-list">
-              ${sortedStores
-                .map(
-                  (store, index) => `
-                    <div class="ranking-row">
-                      <span class="rank-number">${index + 1}</span>
-                      <span class="ranking-copy"><strong>${escapeHtml(
-                        store.name,
-                      )}</strong><span>${escapeHtml(
-                        store.manager,
-                      )} · ${store.issues} 项待整改</span></span>
-                      <span class="ranking-score">${store.score}</span>
-                    </div>
-                  `,
-                )
-                .join("")}
+              ${
+                sortedStores.length
+                  ? sortedStores
+                      .map(
+                        (store, index) => `
+                          <div class="ranking-row">
+                            <span class="rank-number">${index + 1}</span>
+                            <span class="ranking-copy"><strong>${escapeHtml(
+                              store.name,
+                            )}</strong><span>${escapeHtml(
+                              store.manager,
+                            )} · ${store.issues} 项待整改</span></span>
+                            <span class="ranking-score">${store.score}</span>
+                          </div>
+                        `,
+                      )
+                      .join("")
+                  : `<div class="empty-state"><strong>暂无已巡检门店</strong><p>完成首次巡检后会自动生成门店排行。</p></div>`
+              }
             </div>
           </section>
 
@@ -4675,11 +4914,11 @@
           <div class="page-heading">
             <div class="eyebrow">Business analytics</div>
             <h1>经营报表</h1>
-            <p>商丘区域 10 家门店 · 2026 年 11 月 24 日销售、毛利与巡店质量。</p>
+            <p>商丘区域 10 家门店 · ${latestBusinessDateChineseLabel()}销售、毛利与巡店质量。</p>
           </div>
           <div class="header-actions">
             <select class="form-control" style="height: 40px; min-width: 126px" data-action="report-period">
-              <option value="day">11月24日</option>
+              <option value="day">${latestBusinessDateChineseLabel()}</option>
               <option value="month" ${ui.reportPeriod === "month" ? "selected" : ""}>本月累计</option>
               <option value="quarter">本季度</option>
             </select>
@@ -4715,7 +4954,7 @@
                 <h3>昨日销售额排行</h3>
                 <p>10 家门店 · 按销售额降序</p>
               </div>
-              <span class="badge info">2026-11-24</span>
+              <span class="badge info">${latestBusinessDateLabel()}</span>
             </div>
             <div class="ranking-list">
               ${rankedBySales
@@ -4980,9 +5219,11 @@
   }
 
   function mobileStoreOperationalTasks() {
-    return state.tasks.filter(
-      (task) =>
-        task.storeId === state.storeId && task.assigneeRole === "store",
+    return sortTasksByPriorityAndDue(
+      state.tasks.filter(
+        (task) =>
+          task.storeId === state.storeId && task.assigneeRole === "store",
+      ),
     );
   }
 
@@ -4995,22 +5236,52 @@
   function renderMobileHome() {
     const store = storeById(state.storeId);
     const issues = mobileIssuesForStore();
+    const hasScore =
+      store?.score !== null &&
+      store?.score !== undefined &&
+      store?.score !== "" &&
+      Number.isFinite(Number(store.score));
+    const rankedStores = state.stores
+      .filter(
+        (item) =>
+          item.score !== null &&
+          item.score !== undefined &&
+          item.score !== "" &&
+          Number.isFinite(Number(item.score)),
+      )
+      .sort((left, right) => Number(right.score) - Number(left.score));
+    const storeRank =
+      rankedStores.findIndex((item) => item.id === store?.id) + 1;
+    const trend = Number(store?.trend);
+    const recentInspections = mobileTasksForStore()
+      .filter(
+        (task) =>
+          task.taskType === "inspection" &&
+          task.status === "completed" &&
+          task.storeId === state.storeId,
+      )
+      .slice(-2)
+      .reverse();
     return `
       <div class="store-mobile-content">
         <div class="mobile-greeting">
-          <h1>下午好，门店伙伴</h1>
+          <h1>${greetingText()}，门店伙伴</h1>
           <p>${escapeHtml(store.name)} · 门店小伙伴统一工作台</p>
         </div>
 
         <section class="mobile-score-card">
           <div class="mobile-score-top">
             <span>本月门店运营得分</span>
-            <span class="badge no-dot">${store.score >= 88 ? "表现优秀" : "持续改善中"}</span>
+            <span class="badge no-dot">${hasScore ? (Number(store.score) >= 88 ? "表现优秀" : "持续改善中") : "待巡检"}</span>
           </div>
-          <div class="mobile-score-value"><strong>${store.score}</strong><span>/ 100</span></div>
+          <div class="mobile-score-value"><strong>${hasScore ? Number(store.score) : "—"}</strong><span>${hasScore ? "/ 100" : ""}</span></div>
           <div class="mobile-score-meta">
-            <span>较上期<strong>+${Math.max(1, store.trend)} 分</strong></span>
-            <span>区域排名<strong>第 2 名</strong></span>
+            ${
+              hasScore
+                ? `<span>较上期<strong>${trend >= 0 ? "+" : ""}${trend} 分</strong></span>`
+                : `<span>完成首次巡检后生成运营得分</span>`
+            }
+            ${hasScore && storeRank > 0 ? `<span>区域排名<strong>第 ${storeRank} 名</strong></span>` : ""}
           </div>
         </section>
 
@@ -5022,6 +5293,7 @@
                 "camera",
                 "icon-sm",
               )}</span>
+              ${mobileIssuesForStore().length ? `<span class="mobile-quick-badge">${mobileIssuesForStore().length}</span>` : ""}
               待整改
             </button>
             <button class="mobile-quick" data-action="mobile-tab" data-mobile-tab="tasks">
@@ -5029,6 +5301,7 @@
                 "list-checks",
                 "icon-sm",
               )}</span>
+              ${mobileStoreOperationalTasks().filter((task) => !["completed", "submitted"].includes(task.status)).length ? `<span class="mobile-quick-badge">${mobileStoreOperationalTasks().filter((task) => !["completed", "submitted"].includes(task.status)).length}</span>` : ""}
               日常任务
             </button>
             <button class="mobile-quick" data-action="open-learning">
@@ -5097,6 +5370,7 @@
                             issue.severity,
                           )}</span>
                           <strong>${escapeHtml(issue.title)}</strong>
+                          <span class="mobile-card-chevron">${icon("chevron", "icon-sm")}</span>
                         </div>
                         <div class="mobile-issue-meta">
                           <span>${escapeHtml(issue.id)} · ${escapeHtml(
@@ -5124,23 +5398,25 @@
             <h2>最近巡检</h2>
             <button data-action="mobile-tab" data-mobile-tab="history">全部记录</button>
           </div>
-          ${mobileTasksForStore()
-            .slice(-2)
-            .reverse()
-            .map(
-              (task) => `
-                <div class="mobile-history-row">
-                  <span class="history-score">${task.resultScore || "—"}</span>
-                  <span class="history-copy"><strong>${escapeHtml(
-                    task.title,
-                  )}</strong><span>${escapeHtml(
-                    task.completedAt || task.dueLabel,
-                  )} · ${escapeHtml(task.inspector)}</span></span>
-                  ${icon("chevron", "icon-sm")}
-                </div>
-              `,
-            )
-            .join("")}
+          ${
+            recentInspections.length
+              ? recentInspections
+                  .map(
+                    (task) => `
+                      <div class="mobile-history-row">
+                        <span class="history-score">${task.resultScore || "—"}</span>
+                        <span class="history-copy"><strong>${escapeHtml(
+                          task.title,
+                        )}</strong><span>${escapeHtml(
+                          task.completedAt || task.dueLabel,
+                        )} · ${escapeHtml(task.inspector)}</span></span>
+                        ${icon("chevron", "icon-sm")}
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : `<div class="mobile-issue-card"><div class="mobile-issue-head"><strong>暂无巡检记录</strong></div><div class="mobile-issue-meta"><span>督导完成巡检后会显示得分和记录</span>${icon("clipboard", "icon-sm")}</div></div>`
+          }
         </section>
       </div>
     `;
@@ -5154,7 +5430,7 @@
       <div class="store-mobile-content">
         <div class="mobile-greeting">
           <h1>问题整改</h1>
-          <p>上传整改凭证，提交后由督导复核关闭</p>
+          <p>门店提交整改凭证，由督导或区域经理复核通过或驳回</p>
         </div>
         <section class="mobile-section" style="margin-top: 4px">
           ${
@@ -5168,6 +5444,7 @@
                             issue.severity,
                           )}</span>
                           <strong>${escapeHtml(issue.title)}</strong>
+                          <span class="mobile-card-chevron">${icon("chevron", "icon-sm")}</span>
                         </div>
                         <div class="mobile-issue-meta">
                           <span class="badge ${statusMeta(issue.status).className}">${
@@ -5291,6 +5568,12 @@
 
   function renderMobileProfile() {
     const store = storeById(state.storeId);
+    const releaseState = appReleaseState();
+    const hasScore =
+      store?.score !== null &&
+      store?.score !== undefined &&
+      store?.score !== "" &&
+      Number.isFinite(Number(store.score));
     return `
       <div class="store-mobile-content">
         <div class="mobile-greeting">
@@ -5320,12 +5603,23 @@
         <section class="mobile-section">
           <div class="mobile-section-title"><h2>运营数据</h2></div>
           <div class="mobile-quick-grid">
-            <div class="mobile-quick"><strong style="font-size: 19px">${store.score}</strong>门店得分</div>
+            <div class="mobile-quick"><strong style="font-size: 19px">${hasScore ? Number(store.score) : "—"}</strong>门店得分</div>
             <div class="mobile-quick"><strong style="font-size: 19px">${store.issues}</strong>待整改</div>
             <div class="mobile-quick"><strong style="font-size: 19px">${tasksForCompletedCount(
               store.id,
             )}</strong>已完成巡检</div>
           </div>
+        </section>
+        <section class="mobile-section">
+          <div class="mobile-section-title">
+            <h2>版本</h2>
+            <span class="badge ${releaseState.updateAvailable ? "warning" : "success"} no-dot">${releaseState.updateAvailable ? "有新版本" : "已是最新"}</span>
+          </div>
+          <button class="mobile-version-entry" data-action="check-update">
+            <span class="mobile-quick-icon" style="--accent: var(--orange); --tint: var(--orange-soft)">${icon("refresh", "icon-sm")}</span>
+            <span class="mobile-version-copy"><strong>版本与更新</strong><span>当前版本 ${escapeHtml(releaseState.currentVersion)}${releaseState.updateAvailable && releaseState.latestVersion ? ` · 最新 ${escapeHtml(releaseState.latestVersion)}` : " · 有新版本时自动提醒"}</span></span>
+            ${icon("chevron", "icon-sm")}
+          </button>
         </section>
       </div>
     `;
@@ -5379,16 +5673,18 @@
               : renderMobileHome();
     return `
       <div class="store-portal-wrap">
-        <div class="store-portal-role" style="position: fixed; top: 22px; right: 24px; z-index: 20">
-          <div class="store-portal-actions">
-            ${renderRoleSelect()}
-            <button class="icon-button" data-action="feedback-center" aria-label="反馈与建议" title="反馈与建议">${icon("message")}</button>
-            <button class="logout-text-button" data-action="logout">退出</button>
-          </div>
-        </div>
         <div class="phone-shell">
           <div class="phone-screen">
             <div class="store-mobile">
+              <div class="store-mobile-toolbar">
+                ${
+                  state.rolePreview
+                    ? `<button class="role-preview-exit store-preview-return" data-action="exit-role-preview" type="button">${icon("arrow-up-right", "icon-sm")} 返回区域经理</button>`
+                    : ""
+                }
+                <button class="icon-button" data-action="feedback-center" aria-label="反馈与建议" title="反馈与建议">${icon("message")}</button>
+                <button class="logout-text-button" data-action="logout">退出</button>
+              </div>
               <header class="store-mobile-header">
                 <div class="store-mobile-brand">${icon("check-circle", "icon-sm")}</div>
                 <div class="store-mobile-heading">
@@ -5767,12 +6063,15 @@
       return;
     }
     try {
+      const storedCursor = localStorage.getItem(
+        CLOUD_NOTIFICATION_CURSOR_KEY,
+      );
       const [remote, notifications] = await Promise.all([
         cloudRequest("/workspace"),
         cloudRequest(
-          `/notifications?since=${Number(
-            localStorage.getItem(CLOUD_NOTIFICATION_CURSOR_KEY) || 0,
-          )}`,
+          storedCursor
+            ? `/notifications?since=${Number(storedCursor)}`
+            : "/notifications?bootstrap=1",
         ),
       ]);
       if (Number(remote.revision) > cloudRevision) {
@@ -5781,17 +6080,32 @@
         applyCloudWorkspace(remote.state, currentCloudUser(), true);
         showToast("已同步其他设备的云端更新");
       }
+      const deliveredIds = new Set(
+        JSON.parse(
+          localStorage.getItem("xundian-delivered-notification-ids") ||
+            "[]",
+        ),
+      );
       for (const notification of notifications.items || []) {
+        if (deliveredIds.has(notification.id)) continue;
         notifyDevice(
           notification.title,
           notification.body,
           `cloud-${notification.id}`,
         );
+        deliveredIds.add(notification.id);
+      }
+      localStorage.setItem(
+        "xundian-delivered-notification-ids",
+        JSON.stringify([...deliveredIds].slice(-200)),
+      );
+      if (notifications.cursor) {
         localStorage.setItem(
           CLOUD_NOTIFICATION_CURSOR_KEY,
-          String(notification.createdAt),
+          String(notifications.cursor),
         );
       }
+      setLauncherBadgeCount(actionableBadgeCount());
     } catch (error) {
       if (error.status === 401) handleCloudUnauthorized();
     }
@@ -5889,6 +6203,7 @@
     const root = document.getElementById("app");
     const account = currentAccount();
     if (!state.authenticated || !account) {
+      setLauncherBadgeCount(0);
       renderLoginScreen();
       return;
     }
@@ -5910,13 +6225,166 @@
       state.role = "hq";
       state.rolePreview = false;
     }
+    applyLaunchTarget();
+    if (state.page === "learning" || ui.mobileTab === "learning") {
+      window.setTimeout(() => loadLearningProgress(false), 0);
+    }
     root.innerHTML =
       state.role === "store" ? renderStorePortal() : renderDesktopPage();
     root.setAttribute("aria-busy", "false");
+    setLauncherBadgeCount(actionableBadgeCount());
     window.setTimeout(scheduleNativeReminders, 0);
   }
 
   let updateCheckInFlight = false;
+  let latestReleaseInfo = null;
+  let mandatoryUpdateInfo = null;
+  try {
+    latestReleaseInfo = JSON.parse(
+      localStorage.getItem("xundian-latest-release-info") || "null",
+    );
+  } catch {
+    latestReleaseInfo = null;
+  }
+  function isNewerVersion(candidate, current) {
+    const normalize = (value) =>
+      String(value || "")
+        .split(/[.+-]/)
+        .map((part) => Number.parseInt(part, 10))
+        .filter((part) => Number.isFinite(part));
+    const next = normalize(candidate);
+    const installed = normalize(current);
+    if (!next.length || !installed.length) return false;
+    const length = Math.max(next.length, installed.length);
+    for (let index = 0; index < length; index += 1) {
+      const difference = (next[index] || 0) - (installed[index] || 0);
+      if (difference !== 0) return difference > 0;
+    }
+    return false;
+  }
+
+  function isPublishedRelease(release) {
+    const requiredPlatforms = ["web", "pwa", "android", "harmony", "ios"];
+    return Boolean(
+      release &&
+        release.releaseStatus === "released" &&
+        requiredPlatforms.every(
+          (platform) =>
+            release.platforms?.[platform]?.status === "published",
+        ),
+    );
+  }
+
+  function appReleaseState() {
+    const currentVersion =
+      appPlatform === "android"
+        ? NATIVE_APP_VERSION || APP_VERSION
+        : APP_VERSION;
+    const latestVersion =
+      appPlatform === "android"
+        ? latestReleaseInfo?.nativeVersion
+        : appPlatform === "harmony"
+          ? latestReleaseInfo?.harmonyVersion
+          : latestReleaseInfo?.version;
+    return {
+      currentVersion,
+      latestVersion,
+      updateAvailable:
+        Boolean(latestReleaseInfo) &&
+        isPublishedRelease(latestReleaseInfo) &&
+        isNewerVersion(latestVersion, currentVersion),
+    };
+  }
+
+  function openUpdateModal(release, options = {}) {
+    const isAndroidNative =
+      isNativeApp &&
+      appPlatform !== "harmony" &&
+      Boolean(nativeBridge?.downloadAndInstallUpdate);
+    const forced = Boolean(options.force && isAndroidNative);
+    const currentVersion = isNativeApp
+      ? appPlatform === "android"
+        ? NATIVE_APP_VERSION || APP_VERSION
+        : APP_VERSION
+      : APP_VERSION;
+    const latestVersion =
+      appPlatform === "harmony"
+        ? release.harmonyVersion || release.version
+        : isAndroidNative
+          ? release.nativeVersion || release.version
+          : release.version;
+    const notes = Array.isArray(release.notes) ? release.notes.slice(0, 4) : [];
+    const action = isAndroidNative
+      ? "native-update"
+      : isNativeApp
+        ? "close-modal"
+        : "apply-web-update";
+    const primaryLabel = isAndroidNative
+      ? "下载更新"
+      : isNativeApp
+        ? "知道了"
+        : "立即更新";
+
+    mandatoryUpdateInfo = forced ? release : null;
+    document.getElementById("modal-root").innerHTML = `
+      <div class="modal-backdrop">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="updateTitle">
+          <div class="modal-header">
+            <div>
+              <div class="eyebrow">Version update</div>
+              <h2 id="updateTitle">${forced ? "需要更新后继续使用" : "发现新版本"}</h2>
+              <p>${forced ? "这是必须更新的版本，请先完成更新。" : "更新不会自动下载，需要你确认后才会开始。"}</p>
+            </div>
+            ${forced ? "" : `<button class="close-button" data-action="close-modal" aria-label="关闭">${icon("x")}</button>`}
+          </div>
+          <div class="modal-body">
+            <div class="insight-list">
+              <div class="insight-item">
+                <span class="insight-number">${icon("download", "icon-sm")}</span>
+                <p><strong>当前版本 ${escapeHtml(currentVersion)} · 最新版本 ${escapeHtml(latestVersion || "—")}</strong>点击下方“${primaryLabel}”后才会开始下载或刷新。</p>
+              </div>
+              ${notes
+                .map(
+                  (note) =>
+                    `<div class="insight-item"><span class="insight-number">${icon("check", "icon-sm")}</span><p>${escapeHtml(note)}</p></div>`,
+                )
+                .join("")}
+              ${
+                isAndroidNative
+                  ? `<div class="form-hint">下载完成后，仍需在手机系统安装界面点击“安装”。</div>`
+                  : appPlatform === "harmony"
+                    ? `<div class="form-hint">鸿蒙版本请前往华为应用市场完成更新。</div>`
+                    : `<div class="form-hint">点击“立即更新”后会刷新到最新版网页。</div>`
+              }
+            </div>
+          </div>
+          <div class="modal-footer">
+            ${forced ? `<span class="footer-info">关键版本需完成更新</span>` : `<button class="button button-secondary" data-action="close-modal">稍后</button>`}
+            <button class="button button-primary" data-action="${action}">${primaryLabel}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function startNativeUpdate(release) {
+    const downloadUrl =
+      release.downloadUrl ||
+      "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/web/xundian-cloud-native.apk";
+    if (nativeBridge?.downloadAndInstallUpdate) {
+      nativeBridge.downloadAndInstallUpdate(
+        downloadUrl,
+        release.nativeVersion || "",
+      );
+      showToast("正在下载更新，完成后会弹出系统安装确认");
+      return;
+    }
+    showToast("正在打开更新下载地址");
+    window.setTimeout(() => {
+      window.location.href = downloadUrl;
+    }, 180);
+  }
+
   async function checkForAppUpdate(manual = false) {
     if (updateCheckInFlight) return;
     updateCheckInFlight = true;
@@ -5925,10 +6393,33 @@
         cache: "no-store",
       });
       const release = await response.json();
+      latestReleaseInfo = release;
+      localStorage.setItem(
+        "xundian-latest-release-info",
+        JSON.stringify(release),
+      );
+      localStorage.removeItem("xundian-native-auto-install-version");
+      if (
+        state.page === "management" ||
+        (state.role === "store" && ui.mobileTab === "profile")
+      ) {
+        renderApp();
+      }
+      if (isNativeApp && appPlatform === "harmony") {
+        if (manual) {
+          showToast(
+            release.harmonyVersion
+              ? `鸿蒙版 ${release.harmonyVersion} 将通过应用市场自动提醒更新`
+              : "当前为鸿蒙客户端，应用市场会自动检查更新",
+          );
+        }
+        return;
+      }
       if (
         isNativeApp &&
+        isPublishedRelease(release) &&
         release.nativeVersion &&
-        release.nativeVersion !== NATIVE_APP_VERSION
+        isNewerVersion(release.nativeVersion, NATIVE_APP_VERSION)
       ) {
         localStorage.setItem(
           "xundian-last-native-release",
@@ -5939,8 +6430,8 @@
         );
         if (notifiedVersion !== release.nativeVersion) {
           notifyDevice(
-            "巡店云有新版本",
-            `原生版 ${release.nativeVersion} 已发布，请到管理中心下载更新。`,
+            release.forceUpdate ? "巡店云需要更新" : "巡店云有新版本",
+            `Android ${release.nativeVersion} 已发布，请打开“版本与更新”手动下载安装。`,
             `app-update-${release.nativeVersion}`,
           );
           localStorage.setItem(
@@ -5948,23 +6439,30 @@
             release.nativeVersion,
           );
         }
+        if (
+          (manual || release.forceUpdate === true) &&
+          !mandatoryUpdateInfo
+        ) {
+          openUpdateModal(release, {
+            force: release.forceUpdate === true,
+          });
+        }
         if (manual) {
-          showToast(
-            `发现原生版 ${release.nativeVersion}，可在管理中心下载更新`,
-          );
+          showToast(`发现 Android ${release.nativeVersion}，可手动下载更新`);
         }
         return;
       }
-      if (!isNativeApp && release.version && release.version !== APP_VERSION) {
-        showToast(`发现新版本 ${release.version}，正在自动更新`);
+      if (
+        !isNativeApp &&
+        isPublishedRelease(release) &&
+        release.version &&
+        isNewerVersion(release.version, APP_VERSION)
+      ) {
         localStorage.setItem(
           "xundian-last-release",
           JSON.stringify(release),
         );
-        const channel = new BroadcastChannel("xundian-app-update");
-        channel.postMessage({ version: release.version });
-        channel.close();
-        window.setTimeout(() => location.reload(), 900);
+        if (manual) openUpdateModal(release);
         return;
       }
       if (manual) {
@@ -5984,7 +6482,8 @@
   }
 
   window.__xundianAppVersion = APP_VERSION;
-  window.setInterval(() => checkForAppUpdate(false), 60_000);
+  window.setInterval(() => checkForAppUpdate(false), 5 * 60_000);
+  window.setTimeout(() => checkForAppUpdate(false), 2_500);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") checkForAppUpdate(false);
   });
@@ -6017,8 +6516,13 @@
     }, 2800);
   }
 
-  function closeModal() {
+  function closeModal(forceClose = false) {
+    if (mandatoryUpdateInfo && !forceClose) {
+      showToast("当前版本需要更新后才能继续使用", "error");
+      return;
+    }
     document.getElementById("modal-root").innerHTML = "";
+    mandatoryUpdateInfo = null;
   }
 
   function closeDrawer() {
@@ -6594,11 +7098,23 @@
                   .join("")}
               </div>
             </div>
-            <div class="modal-footer"><span class="footer-info">提交后立即评分</span><button type="button" class="button button-secondary" data-action="close-modal">取消</button><button type="submit" class="button button-primary">提交考试</button></div>
+            <div class="modal-footer"><span class="footer-info" id="examProgressText">已答 0 / ${learningExamQuestions.length}</span><button type="button" class="button button-secondary" data-action="close-modal">取消</button><button type="submit" class="button button-primary">提交考试</button></div>
           </form>
         </div>
       </div>
     `;
+    const form = document.getElementById("learningExamForm");
+    const progressText = document.getElementById("examProgressText");
+    const updateProgress = () => {
+      const answered = new Set(
+        [...form.querySelectorAll('input[type="radio"]:checked')].map(
+          (input) => input.name,
+        ),
+      ).size;
+      progressText.textContent = `已答 ${answered} / ${learningExamQuestions.length}`;
+    };
+    form.addEventListener("change", updateProgress);
+    updateProgress();
   }
 
   function renderLearningContent(mobile = false) {
@@ -6716,6 +7232,7 @@
                   )
                   .join("")}</select></div>
                 <div class="form-field full"><label>任务标题</label><input class="form-control" name="title" required placeholder="例如：复查消防通道整改情况" /></div>
+                <div class="form-field"><label>任务优先级</label><select class="form-control" name="priority"><option>普通</option><option>重要</option><option>紧急</option></select></div>
                 <div class="form-field"><label>完成期限</label><input class="form-control" type="date" name="due" value="2026-11-28" required /></div>
                 <div class="form-field full"><label>任务说明</label><textarea class="form-control" name="description" placeholder="说明任务背景、完成要求和审核标准"></textarea></div>
                 <div class="form-field full">
@@ -7611,10 +8128,13 @@
     if (!issue) return;
     const store = storeById(issue.storeId);
     const status = statusMeta(issue.status);
+    const isStoreRole = state.role === "store";
     const nextAction = {
       pending: { action: "start-rectification", label: "开始整改" },
-      rectifying: { action: "submit-review", label: "提交复核" },
-      review: { action: "close-issue", label: "复核通过" },
+      rectifying: { action: "submit-review", label: "提交上级复核" },
+      review: isStoreRole
+        ? { action: "submit-review", label: "等待上级复核" }
+        : { action: "close-issue", label: "复核通过" },
       closed: { action: "reopen-issue", label: "重新打开" },
     }[issue.status];
     document.getElementById("drawer-root").innerHTML = `
@@ -7690,7 +8210,7 @@
               }
               ${
                 issue.status === "closed"
-                  ? `<div class="timeline-item done"><p>督导复核通过，问题已关闭</p><span>闭环完成</span></div>`
+                  ? `<div class="timeline-item done"><p>督导或区域经理复核通过</p><span>整改完成</span></div>`
                   : ""
               }
             </div>
@@ -7698,13 +8218,20 @@
         </div>
         <div class="drawer-footer">
           ${
-            issue.status === "pending"
+            issue.status === "pending" && !isStoreRole
               ? `<button class="button button-secondary" data-action="assign-issue" data-issue-id="${issue.id}">转派</button>`
+              : ""
+          }
+          ${
+            issue.status === "review" && !isStoreRole
+              ? `<button class="button button-secondary" data-action="reject-issue" data-issue-id="${issue.id}">驳回整改</button>`
               : ""
           }
           <button class="button ${
             issue.status === "closed" ? "button-secondary" : "button-primary"
-          }" data-action="${nextAction.action}" data-issue-id="${issue.id}">
+          }" data-action="${nextAction.action}" data-issue-id="${issue.id}" ${
+            isStoreRole && issue.status === "review" ? "disabled" : ""
+          }>
             ${nextAction.label}
           </button>
         </div>
@@ -7904,11 +8431,6 @@
     closeModal();
     closeDrawer();
     renderApp();
-    notifyDevice(
-      "巡店报告已提交",
-      `${store.name} 巡检得分 ${score}，等待区域经理审核`,
-      `inspection-submit:${task.id}`,
-    );
     showToast(
       `巡检已提交审核，得分 ${score}${
         fail.length ? `，已生成 ${fail.length} 个整改问题` : ""
@@ -7988,7 +8510,7 @@
       [
         "巴布豆商丘区域经营报表",
         "商丘区域",
-        "2026-11-24",
+        latestBusinessDateLabel(),
         state.stores.length,
         totalSales(),
         totalGrossProfit(),
@@ -8063,6 +8585,14 @@
       showToast("当前账号没有访问该管理页面的权限", "error");
       return;
     }
+    if (page !== state.page) {
+      if (page === "overview") {
+        ui.pageHistory = [];
+      } else {
+        ui.pageHistory.push(state.page);
+        ui.pageHistory = ui.pageHistory.slice(-20);
+      }
+    }
     state.page = page;
     if (page === "learning") learningLoaded = false;
     saveState();
@@ -8131,6 +8661,7 @@
       state.rolePreview = false;
       state.page = "overview";
       ui.mobileTab = "home";
+      ui.pageHistory = [];
       saveState();
       renderApp();
       showToast("已返回区域经理视角");
@@ -8175,13 +8706,6 @@
       saveState();
       closeModal();
       renderApp();
-      notifyDevice(
-        approved ? "任务审核通过" : "任务已驳回",
-        approved
-          ? `${task.title} 已审核通过`
-          : `${task.title} 被驳回，请补充完成结果后重新提交`,
-        `task-review:${task.id}`,
-      );
       showToast(approved ? "任务审核通过" : "任务已驳回执行人");
       return;
     }
@@ -8479,7 +9003,40 @@
       submitInspection(target.dataset.taskId);
       return;
     }
-    if (action === "start-rectification" || action === "submit-review" || action === "close-issue" || action === "reopen-issue") {
+    if (action === "reject-issue") {
+      if (state.role === "store") {
+        showToast("门店没有复核权限", "error");
+        return;
+      }
+      const issue = issueById(target.dataset.issueId);
+      if (!issue) return;
+      const reason = window.prompt(
+        "请输入驳回原因",
+        "整改凭证不符合要求，请重新整改",
+      );
+      if (reason === null) return;
+      issue.status = "rectifying";
+      issue.reviewResult = "rejected";
+      issue.reviewComment =
+        String(reason).trim() || "整改凭证不符合要求，请重新整改";
+      issue.reviewedAt = new Date().toISOString();
+      issue.reviewedBy = currentAccount()?.name || "";
+      const store = storeById(issue.storeId);
+      store.issues = state.issues.filter(
+        (item) => item.storeId === store.id && item.status !== "closed",
+      ).length;
+      saveState();
+      openIssueDrawer(issue.id);
+      renderApp();
+      showToast("整改已驳回门店重新处理");
+      return;
+    }
+    if (
+      action === "start-rectification" ||
+      action === "submit-review" ||
+      action === "close-issue" ||
+      action === "reopen-issue"
+    ) {
       const issue = issueById(target.dataset.issueId);
       if (!issue) return;
       const nextStatus = {
@@ -8489,6 +9046,26 @@
         "reopen-issue": "pending",
       }[action];
       issue.status = nextStatus;
+      if (nextStatus === "rectifying") {
+        issue.startedAt = new Date().toISOString();
+      }
+      if (nextStatus === "review") {
+        issue.submittedAt = new Date().toISOString();
+      }
+      if (nextStatus === "closed") {
+        issue.closedAt = new Date().toISOString();
+        issue.closedBy = currentAccount()?.name || "";
+        issue.closureMode = "supervisor_review";
+        issue.reviewResult = "approved";
+        issue.reviewedAt = issue.closedAt;
+        issue.reviewedBy = issue.closedBy;
+      }
+      if (nextStatus === "pending") {
+        issue.reopenedAt = new Date().toISOString();
+        issue.closedAt = "";
+        issue.closedBy = "";
+        issue.closureMode = "";
+      }
       const store = storeById(issue.storeId);
       store.issues = state.issues.filter(
         (item) => item.storeId === store.id && item.status !== "closed",
@@ -8496,22 +9073,11 @@
       saveState();
       openIssueDrawer(issue.id);
       renderApp();
-      notifyDevice(
-        nextStatus === "closed"
-          ? "整改已通过"
-          : nextStatus === "review"
-            ? "整改已提交"
-            : nextStatus === "rectifying"
-              ? "整改任务已开始"
-              : "整改问题已重新打开",
-        issue.title,
-        `issue-status:${issue.id}:${nextStatus}`,
-      );
       showToast(
         {
           rectifying: "已开始整改",
-          review: "整改凭证已提交，等待督导复核",
-          closed: "问题已复核通过并关闭",
+          review: "整改凭证已提交，等待督导或区域经理复核",
+          closed: "整改复核通过",
           pending: "问题已重新打开",
         }[nextStatus],
       );
@@ -8575,11 +9141,6 @@
       }
       saveState();
       renderApp();
-      notifyDevice(
-        approving ? "账号申请已通过" : "账号申请已拒绝",
-        `${approval.name} · ${approval.requestedRole}`,
-        `approval:${approval.id}`,
-      );
       showToast(
         approving
           ? `已通过 ${approval.name} 的 ${approval.requestedRole} 申请${createdCredentials}`
@@ -8605,23 +9166,42 @@
       return;
     }
     if (action === "native-update") {
-      let downloadUrl =
-        "https://huangqing631.github.io/xundian-cloud/xundian-cloud-native.apk";
+      let release = {
+        downloadUrl:
+          "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/web/xundian-cloud-native.apk",
+      };
       try {
-        const release = JSON.parse(
+        const cachedRelease = JSON.parse(
           localStorage.getItem("xundian-last-native-release") || "{}",
         );
-        if (release.downloadUrl) downloadUrl = release.downloadUrl;
+        if (cachedRelease.downloadUrl) release = cachedRelease;
       } catch {
         // Use the stable download address when release metadata is unavailable.
       }
-      showToast("正在打开原生版下载页面");
-      window.setTimeout(() => {
-        window.location.href = downloadUrl;
-      }, 180);
+      closeModal(true);
+      startNativeUpdate(release);
+      return;
+    }
+    if (action === "apply-web-update") {
+      closeModal(true);
+      try {
+        const registration = await navigator.serviceWorker?.getRegistration?.();
+        await registration?.update?.();
+      } catch {
+        // A direct reload still gets the latest HTML when the worker is unavailable.
+      }
+      try {
+        const channel = new BroadcastChannel("xundian-app-update");
+        channel.postMessage({ type: "reload" });
+        channel.close();
+      } catch {
+        // BroadcastChannel is unavailable in some embedded browsers.
+      }
+      window.location.reload();
       return;
     }
     if (action === "notifications") {
+      setLauncherBadgeCount(actionableBadgeCount());
       enableDeviceNotifications();
       return;
     }
@@ -9232,11 +9812,6 @@
       saveState();
       closeModal();
       renderApp();
-      notifyDevice(
-        "任务已提交",
-        `${task.title} 已提交，等待区域经理审核`,
-        `task-submit:${task.id}`,
-      );
       showToast("任务已提交，等待区域经理审核");
       return;
     }
@@ -9381,6 +9956,7 @@
         templateId: taskType === "inspection" ? "tpl-daily" : null,
         taskType,
         assigneeRole,
+        priority: String(data.get("priority") || "普通"),
         status: "pending",
         reviewStatus: "not_submitted",
         progress: 0,
@@ -9402,11 +9978,6 @@
         selectedStoreId === "__all__"
           ? `全部门店（${targetStores.length} 家）`
           : targetStores[0].name;
-      notifyDevice(
-        "收到新的任务",
-        `${title} · ${targetLabel}`,
-        `assignment:${batchId}`,
-      );
       showToast(`任务已下发至${targetLabel}`);
       return;
     }
@@ -9422,6 +9993,10 @@
         storeId,
         title: templateById(templateId).name,
         templateId,
+        taskType: "inspection",
+        assigneeRole: "supervisor",
+        origin: "supervisor_onsite",
+        suppressNotification: true,
         date: String(Number(day)),
         month: `${Number(month)}月`,
         dueLabel: `现场发起 · ${data.get("time") || "15:30"}`,
@@ -9433,11 +10008,6 @@
       });
       saveState();
       closeDrawer();
-      notifyDevice(
-        "巡店已开始",
-        `${storeById(storeId)?.name || "门店"} · 现场检查已发起`,
-        `visit:${taskId}`,
-      );
       showToast("巡店已发起，开始现场检查");
       openInspection(taskId);
       return;
@@ -9554,12 +10124,12 @@
         closeCameraCapture();
         return true;
       }
-      if (document.getElementById("modal-root")?.children.length) {
-        closeModal();
-        return true;
-      }
       if (document.getElementById("drawer-root")?.children.length) {
         closeDrawer();
+        return true;
+      }
+      if (document.getElementById("modal-root")?.children.length) {
+        closeModal();
         return true;
       }
       if (state.role === "store" && ui.mobileTab !== "home") {
@@ -9576,8 +10146,12 @@
         renderApp();
         return true;
       }
-      if (state.page && state.page !== "overview" && state.role !== "store") {
-        state.page = "overview";
+      if (
+        state.role !== "store" &&
+        ui.pageHistory.length &&
+        state.page !== "overview"
+      ) {
+        state.page = ui.pageHistory.pop() || "overview";
         saveState();
         renderApp();
         return true;
@@ -9588,6 +10162,7 @@
     }
   };
 
+  setLauncherBadgeCount(actionableBadgeCount());
   renderApp();
   if (CLOUD_API_BASE && cloudToken()) {
     restoreCloudSession().catch(() => {});
