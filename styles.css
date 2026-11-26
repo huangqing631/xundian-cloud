@@ -3390,6 +3390,16 @@ svg {
     box-shadow 160ms ease;
 }
 
+.form-error {
+  padding: 10px 12px;
+  border: 1px solid rgba(228, 72, 62, 0.28);
+  border-radius: var(--radius-sm);
+  background: var(--red-soft);
+  color: var(--red);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .form-control:focus {
   border-color: rgba(255, 90, 61, 0.45);
   box-shadow: 0 0 0 4px rgba(255, 90, 61, 0.07);
@@ -3452,6 +3462,12 @@ textarea.form-control {
   background: #fff;
   box-shadow: var(--shadow-sm);
   font-weight: 700;
+}
+
+.inspection-side-item.needs-attention {
+  border-color: var(--orange);
+  background: var(--orange-soft);
+  box-shadow: inset 3px 0 0 var(--orange);
 }
 
 .inspection-side-item .category-check {
@@ -5244,6 +5260,22 @@ textarea.form-control {
 
   .inspection-side {
     display: none;
+  }
+
+  .route-planner-modal .inspection-shell {
+    grid-template-rows: minmax(170px, 34vh) minmax(0, 1fr);
+  }
+
+  .route-planner-modal .inspection-side {
+    display: block;
+    max-height: 34vh;
+    overflow: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .route-planner-modal .inspection-main {
+    overflow: auto;
   }
 
   .inspection-main {
