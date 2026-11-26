@@ -7,10 +7,12 @@
   "approvedAt": "2026-11-26T21:19:54+08:00",
   "nativeVersion": "1.0.22",
   "nativeVersionCode": 23,
-  "nativeSha256": "1D7A1FDCDF9C7B94B8A10083CCE44E615B3B049A371E490BD33EB6D7F3BD9B54",
-  "nativeSize": 2018829,
-  "harmonyVersion": "1.0.0",
-  "harmonyVersionCode": 1000000,
+  "nativeSha256": "F77EFF47CD2ADA5A186851BC35E76C06B99D1BCE2E9DECBFA17D9197F61DDBC0",
+  "nativeSize": 2018957,
+  "harmonyVersion": "1.0.1",
+  "harmonyVersionCode": 1000001,
+  "harmonySha256": "3A0D0A2D3CE6768BCA781E04A2675CB8D56FF1008A5090BD775F1F7B3EE3B5F3",
+  "harmonySize": 157436,
   "downloadUrl": "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/web/xundian-cloud-native.apk",
   "harmonyDownloadUrl": "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/web/xundian-harmony-app-signed.hap",
   "releasedAt": "2026-11-26T21:19:54+08:00",
@@ -29,7 +31,7 @@
       "status": "published"
     },
     "harmony": {
-      "version": "1.0.0",
+      "version": "1.0.1",
       "status": "published"
     },
     "ios": {
@@ -40,6 +42,7 @@
   "notes": [
     "桌面角标改为当前未完成待办数量，不再累计历史未读通知",
     "门店角标按未完成日常任务和未关闭整改事项计算",
-    "Android 1.0.22 后台通知同步时自动刷新业务待办角标"
+    "Android 1.0.22 后台通知同步时自动刷新业务待办角标",
+    "补传鸿蒙 1.0.1 签名安装包并修复下载地址"
   ]
 }
