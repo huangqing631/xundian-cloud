@@ -1,48 +1,33 @@
 {
-  "version": "2026.11.26.41",
+  "version": "2026.11.26.42",
   "releaseStatus": "released",
   "forceUpdate": false,
   "approvalRequired": "黄庆",
   "approvedBy": "黄庆",
-  "approvedAt": "2026-11-26T21:19:54+08:00",
-  "nativeVersion": "1.0.22",
-  "nativeVersionCode": 23,
-  "nativeSha256": "F77EFF47CD2ADA5A186851BC35E76C06B99D1BCE2E9DECBFA17D9197F61DDBC0",
-  "nativeSize": 2018957,
+  "approvedAt": "2026-11-27T01:41:10+08:00",
+  "nativeVersion": "1.0.23",
+  "nativeVersionCode": 24,
+  "nativeSha256": "0F7E6E329BA00B4528B66535A97A6B59D1691B5DBC4CEAA9996B1729FF1499CE",
+  "nativeSize": 2021381,
   "harmonyVersion": "1.0.1",
   "harmonyVersionCode": 1000001,
   "harmonySha256": "3A0D0A2D3CE6768BCA781E04A2675CB8D56FF1008A5090BD775F1F7B3EE3B5F3",
   "harmonySize": 157436,
   "downloadUrl": "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/web/xundian-cloud-native.apk",
   "harmonyDownloadUrl": "https://inadequate-guppy-d1ebsc184b2357e-1541377786.ap-shanghai.app.tcloudbase.com/web/xundian-harmony-app-signed.hap",
-  "releasedAt": "2026-11-26T21:19:54+08:00",
-  "title": "桌面角标与业务待办数量统一",
+  "releasedAt": "2026-11-27T01:41:10+08:00",
+  "title": "恢复云端认证并修复执行人归属",
   "platforms": {
-    "web": {
-      "version": "2026.11.26.41",
-      "status": "published"
-    },
-    "pwa": {
-      "version": "2026.11.26.41",
-      "status": "published"
-    },
-    "android": {
-      "version": "1.0.22",
-      "status": "published"
-    },
-    "harmony": {
-      "version": "1.0.1",
-      "status": "published"
-    },
-    "ios": {
-      "version": "2026.11.26.41",
-      "status": "published"
-    }
+    "web": { "version": "2026.11.26.42", "status": "published" },
+    "pwa": { "version": "2026.11.26.42", "status": "published" },
+    "android": { "version": "1.0.23", "status": "published" },
+    "harmony": { "version": "1.0.1", "status": "published" },
+    "ios": { "version": "2026.11.26.42", "status": "published" }
   },
   "notes": [
-    "桌面角标改为当前未完成待办数量，不再累计历史未读通知",
-    "门店角标按未完成日常任务和未关闭整改事项计算",
-    "Android 1.0.22 后台通知同步时自动刷新业务待办角标",
-    "补传鸿蒙 1.0.1 签名安装包并修复下载地址"
+    "恢复云端 API、账号登录与工作区访问",
+    "移除前端内置测试账号和本地密码登录入口",
+    "巡检执行人按当前登录账号记录，任务下发后由实际督导领取",
+    "保留已发布的 HarmonyOS 1.0.1 签名安装包"
   ]
 }
