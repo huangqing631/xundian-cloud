@@ -564,6 +564,25 @@ svg {
   transform: translateY(-1px);
 }
 
+.version-update-entry {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+  border: 1px solid color-mix(in srgb, var(--brand) 20%, var(--line));
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.version-update-entry:hover {
+  background: #ffe3dd;
+}
+
 .notification-button {
   position: relative;
 }
@@ -1132,8 +1151,21 @@ svg {
 .header-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 9px;
+  max-width: 100%;
   flex: 0 0 auto;
+}
+
+.header-actions .button,
+.header-actions select {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.header-actions select {
+  width: auto;
 }
 
 .button {
@@ -2185,6 +2217,28 @@ svg {
   border-radius: 10px;
 }
 
+.management-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.insight-item.has-update {
+  background: #fff8e8;
+  box-shadow: inset 0 0 0 1px rgba(197, 140, 5, 0.2);
+}
+
+.insight-item.has-update .insight-number {
+  color: #fff;
+  background: var(--orange);
+}
+
+.insight-item strong .badge {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .summary-copy strong {
   display: block;
   font-size: 18px;
@@ -3216,6 +3270,20 @@ svg {
   animation: modal-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+.modal > form {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.modal > form {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
 .modal.modal-wide {
   width: min(970px, 100%);
   height: min(800px, calc(100vh - 48px));
@@ -3431,6 +3499,7 @@ textarea.form-control {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 64px;
   margin-bottom: 20px;
   padding: 12px 14px;
   background: linear-gradient(120deg, #fff7eb, #fff);
@@ -3448,14 +3517,30 @@ textarea.form-control {
   font-size: 11px;
 }
 
-.inspection-store-strip span {
+.inspection-store-strip > span:not(.avatar):not(.badge) {
   display: block;
-  margin-top: 3px;
+  min-width: 0;
+  margin-top: 0;
   color: var(--ink-faint);
   font-size: 9px;
 }
 
+.inspection-store-strip > span:not(.avatar):not(.badge) > span {
+  display: block;
+  margin-top: 3px;
+}
+
+.inspection-store-strip .avatar {
+  display: grid;
+  margin-top: 0;
+}
+
 .inspection-store-strip .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-top: 0;
   margin-left: auto;
 }
 
@@ -3640,7 +3725,8 @@ textarea.form-control {
   width: 86px;
   height: 64px;
   flex: 0 0 auto;
-  object-fit: cover;
+  object-fit: contain;
+  background: #f6f4ef;
   border-radius: 7px;
 }
 
@@ -3712,7 +3798,8 @@ textarea.form-control {
   width: 100%;
   height: 95px;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  background: #f6f4ef;
 }
 
 .assignment-photo-item button {
@@ -3745,7 +3832,8 @@ textarea.form-control {
 .instruction-photo-grid img {
   width: 100%;
   height: 100px;
-  object-fit: cover;
+  object-fit: contain;
+  background: #f6f4ef;
   border-radius: 8px;
 }
 
@@ -3917,7 +4005,8 @@ textarea.form-control {
   width: 100%;
   height: 94px;
   display: block;
-  object-fit: cover;
+  object-fit: contain;
+  background: #f6f4ef;
 }
 
 .category-photo-add {
@@ -4321,6 +4410,32 @@ textarea.form-control {
   overflow: auto;
 }
 
+.store-mobile-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: max(4px, env(safe-area-inset-top)) 16px 0;
+}
+
+.store-preview-return {
+  height: 32px;
+  margin-right: auto;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+.store-preview-return {
+  height: 32px;
+  margin-right: auto;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+.store-mobile-toolbar + .store-mobile-header {
+  padding-top: 9px;
+}
+
 .store-mobile-header {
   display: flex;
   align-items: center;
@@ -4363,6 +4478,49 @@ textarea.form-control {
 .store-mobile-content {
   flex: 1;
   padding: 4px 16px 100px;
+}
+
+.store-mobile-heading strong {
+  font-size: 16px;
+}
+
+.store-mobile-heading span {
+  font-size: 10px;
+}
+
+.store-mobile .mobile-greeting p {
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.store-mobile .mobile-section-title h2 {
+  font-size: 16px;
+}
+
+.store-mobile .mobile-section-title button {
+  font-size: 10px;
+}
+
+.store-mobile .mobile-quick {
+  font-size: 10px;
+}
+
+.store-mobile .mobile-issue-head strong {
+  font-size: 12px;
+}
+
+.store-mobile .mobile-issue-meta {
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
+.store-mobile .mobile-tab {
+  font-size: 8.5px;
+}
+
+.store-mobile .mobile-score-top,
+.store-mobile .mobile-score-meta {
+  font-size: 9.5px;
 }
 
 .mobile-greeting {
@@ -4496,6 +4654,7 @@ textarea.form-control {
 }
 
 .mobile-quick {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4506,6 +4665,24 @@ textarea.form-control {
   border-radius: 13px;
   font-size: 8px;
   font-weight: 650;
+}
+
+.mobile-quick-badge {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  color: #fff;
+  background: var(--brand);
+  border: 2px solid #fff;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .mobile-quick-icon {
@@ -4526,6 +4703,10 @@ textarea.form-control {
   border-radius: 13px;
 }
 
+.mobile-issue-card[data-action] {
+  cursor: pointer;
+}
+
 .mobile-issue-head {
   display: flex;
   align-items: center;
@@ -4538,6 +4719,46 @@ textarea.form-control {
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mobile-card-chevron {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-faint);
+}
+
+.mobile-version-entry {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  text-align: left;
+}
+
+.mobile-version-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.mobile-version-copy strong,
+.mobile-version-copy span {
+  display: block;
+}
+
+.mobile-version-copy strong {
+  font-size: 12px;
+}
+
+.mobile-version-copy span {
+  margin-top: 3px;
+  color: var(--ink-faint);
+  font-size: 9px;
+  line-height: 1.5;
 }
 
 .mobile-issue-meta {
@@ -4811,6 +5032,16 @@ textarea.form-control {
   }
 
   .topbar .avatar {
+    display: none;
+  }
+
+  .version-update-entry {
+    width: 38px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .version-update-label {
     display: none;
   }
 
